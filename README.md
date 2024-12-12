@@ -1,5 +1,5 @@
 # Atun - AWS Tagged Tunnel
-[![E2E Tests](https://github.com/automationd/atun/actions/workflows/pr.yml/badge.svg)](https://github.com/AutomationD/atun/actions/workflows/pr.yml)
+[![E2E Tests](https://github.com/automationd/atun/actions/workflows/tests.yml/badge.svg)](https://github.com/AutomationD/atun/actions/workflows/tests.yml)
 
 SSH tunnel cli tool that works without local configuration. It uses EC2 tags to define hosts and ports forwarding
 configuration.
