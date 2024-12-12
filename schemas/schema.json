@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Atun.io EC2 Tag Schema",
+  "description": "Schema for EC2 tags used by Atun.io compatible clients for versioning and host configurations.",
+  "type": "object",
+  "properties": {
+    "atun.io/version": {
+      "type": "string",
+      "description": "Version tag for the schema",
+      "pattern": "^[0-9]+$"
+    },
+    "atun.io/env": {
+      "type": "string",
+      "description": "Env tag for the environment",
+      "pattern": "^.*$"
+    },
+    "atun.io/host": {
+      "type": "object",
+      "patternProperties": {
+        "^.*$": {
+          "type": "object",
+          "properties": {
+            "local": {
+              "type": "string",
+              "description": "Port bound on the local machine",
+              "pattern": "^[0-9]+$"
+            },
+            "proto": {
+              "type": "string",
+              "description": "Forwarding protocol",
+              "enum": ["ssm"]
+            },
+            "remote": {
+              "type": "integer",
+              "description": "Port of the remote host on the internal network. Must be accessible to the bastion host",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          },
+          "required": ["local", "proto", "remote"],
+          "additionalProperties": false
+        }
+      },
+      "description": "Host configuration tags with hostname and forwarding details"
+    }
+  },
+  "required": ["atun.io/version","atun.io/env","atun.io/host"],
+  "additionalProperties": false
+}

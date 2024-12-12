@@ -1,0 +1,95 @@
+name: "Tests: E2E"
+defaults:
+  run:
+    shell: bash
+
+env:
+  AWS_PROFILE: default
+  AWS_REGION: us-east-1
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - feature/wip*
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+# TODO: re-enable other platforms after Ubuntu is working fine
+#          - macos-latest
+#          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.x
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          go mod download
+          task build
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: atun-${{ matrix.os }}-${{ github.sha }}
+          path: ${{ github.workspace }}/bin/atun
+
+  test-e2e:
+    name: E2E Tests
+    needs: build
+    strategy:
+      max-parallel: 1
+      matrix:
+        os:
+          - ubuntu-latest
+#          - windows-latest
+#          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Configure Environment Variables
+        run: |
+          echo "${{ github.workspace }}/bin/" >> $GITHUB_PATH
+          echo "ENV=${{ github.job }}-$(echo $GITHUB_SHA | cut -c 1-6)" >> $GITHUB_ENV
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.x
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+      - uses: actions/download-artifact@v3
+        with:
+          name: atun-${{ matrix.os }}-${{ github.sha }}
+          path: bin
+
+      - name: Make Executable
+        run: |
+          chmod +rx "${{ github.workspace }}/bin/atun"
+          atun version
+
+      - name: Generate Test SSH Key
+        run: ssh-keygen -q -f ~/.ssh/id_rsa
+
+      - name: Run Tests
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+        run: |          
+          go test -v --timeout 0 --tags="e2e" ./test/e2e

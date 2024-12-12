@@ -1,0 +1,29 @@
+version: '3'
+vars:
+  GIT_COMMIT_HASH:
+    sh: git rev-parse --short HEAD
+  GIT_IMPORT_URL: "github.com/automationd/atun/internal/version"
+  GIT_IS_DIRTY:
+    sh: test -n "`git status --porcelain`" && echo "+CHANGES" || true
+  GO_LDFLAGS: -s -w -X {{.GIT_IMPORT_URL}}.GitCommit={{.GIT_COMMIT_HASH}}{{.GIT_IS_DIRTY}}
+  CGO_ENABLED: 0
+tasks:
+  default:
+    deps:
+      - build
+
+  build:
+    cmds:
+      - echo {{.GO_LDFLAGS}}
+      - go version
+      - CGO_ENABLED={{.CGO_ENABLED}} go build -tags=viper_toml1 -ldflags "{{.GO_LDFLAGS}}" -o ./bin/atun
+      - chmod +x ./bin/atun
+
+  test:
+    cmds:
+      - go test -v --timeout 0 ./test/e2e
+#      - go test -v ./... -coverprofile=coverage.out -covermode=atomic
+
+  publish:
+    cmds:
+      - echo "Deploying..."

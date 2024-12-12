@@ -1,0 +1,78 @@
+version: 2
+
+project_name: atun
+
+builds:
+  - id: atun
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+#      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
+
+archives:
+  - id: release_archive
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+release:
+  github:
+    owner: AutomationD
+    name: atun
+  draft: true
+  replace_existing_draft: true
+  make_latest: false
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+brews:
+  - name: atun-dev
+    repository:
+      owner: AutomationD
+      name: homebrew-atun
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    directory: Formula
+    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: Dmitry Kireev
+      email: dmitry@atd.sh
+    homepage: "https://github.com/AutomationD/atun"
+    description: "atun.io is a simple SSM/SSH tunnel manager"
+    license: "Apache 2.0"
+    conflicts:
+      - atun
+      - atun@{{ .Version }}
+    test: |
+      system "#{bin}/atun --version"
+    install: |
+      bin.install "atun"
+
+  - name: atun-dev@{{ .Version }}
+    repository:
+      owner: AutomationD
+      name: homebrew-atun
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    directory: Formula
+    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: Dmitry Kireev
+      email: dmitry@atd.sh
+    homepage: "https://github.com/AutomationD/atun"
+    description: "atun.io is a simple SSM/SSH tunnel manager"
+    license: "Apache 2.0"
+    test: |
+      system "#{bin}/atun --version"
+    install: |
+      bin.install "atun"
