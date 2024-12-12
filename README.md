@@ -32,7 +32,7 @@ brew update && brew fetch --force atun && brew reinstall atun
 ![demo.gif](demo.gif)
 _(UI is still in progress)_
 
-k## Features
+## Features
 
 This tool allows to connect to private resources (RDS, Redis, etc) via EC2 bastion hosts without public IP (via SSM).
 At the moment there are only three commands available: `up`, `down`, and `status`.
