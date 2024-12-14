@@ -39,18 +39,36 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 	// Check if the env var is set and if not set it to the default value. (Maybe there is a better way to do this?)
 	credFilePath := os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
 	if credFilePath == "" {
-		credFilePath = ""
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		credFilePath = fmt.Sprintf("%s/.aws/credentials", homeDir)
+	}
+
+	// Get region from the credentials file if it's not set
+	credFile, err := ini.Load(credFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := credFile.GetSection(c.Profile)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.Region == "" {
+		c.Region = profile.Key("region").String()
 	}
 
 	var config *aws.Config
 
 	if c.EndpointUrl != "" {
 		config = aws.NewConfig().WithRegion(c.Region).WithCredentials(credentials.NewSharedCredentials(credFilePath, c.Profile)).WithEndpoint(c.EndpointUrl)
-		logrus.Debug(fmt.Sprintf("Session established. Endpoint: %s", c.EndpointUrl))
+		logger.Debug("Session established", "credFilePath", credFilePath, "endpoint", c.EndpointUrl)
 	} else {
 		config = aws.NewConfig().WithRegion(c.Region).WithCredentials(credentials.NewSharedCredentials("", c.Profile))
-		logrus.Debug(fmt.Sprintf("Session established with a default endpoint"))
-
+		logger.Debug("Session established with a default endpoint", "credFilePath", credFilePath)
 	}
 
 	sess, err := session.NewSessionWithOptions(session.Options{
@@ -60,13 +78,13 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 		return nil, err
 	}
 	iamSess := iam.New(sess)
-	logger.Debug("Authenticating to AWS", "profile", c.Profile, "region", c.Region, "endpointURL", iamSess.Endpoint, "credFilePath", credFilePath, "iamSess", iamSess)
+	logger.Debug("Authenticating with AWS", "profile", c.Profile, "region", c.Region, "endpointURL", iamSess.Endpoint, "credFilePath", credFilePath, "iamSess", iamSess)
 
 	devices, err := iamSess.ListMFADevices(&iam.ListMFADevicesInput{})
 	if aerr, ok := err.(awserr.Error); ok {
 		switch aerr.Code() {
 		case "SharedCredsLoad":
-			logrus.Error(err)
+			logger.Debug("AWS profile is not valid", "Profile", c.Profile)
 			return nil, fmt.Errorf("AWS profile is not valid (used `%s`). Please set correct AWS_PROFILE via AWS_PROFILE env var, --aws-profile flag or aws_profile config entry in atun.toml", c.Profile)
 		default:
 			// If the endpoint is localhost (LocalStack) then it's not an error
@@ -86,7 +104,7 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 	home, _ := os.UserHomeDir()
 	filePath := home + path
 
-	credFile, err := ini.Load(filePath)
+	credFile, err = ini.Load(filePath)
 	if err != nil {
 		credFile = ini.Empty(ini.LoadOptions{})
 		upd = true

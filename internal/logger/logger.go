@@ -6,6 +6,7 @@
 package logger
 
 import (
+	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
 	"log/slog"
 	"os"
@@ -15,7 +16,8 @@ import (
 var defaultLogger *slog.Logger
 
 // Initialize sets up the logger with a specified log level
-func Initialize(logLevel string) {
+func Initialize(logLevel string, logPlainText bool) {
+
 	// Map log levels from configuration to slog
 	var slogLevel slog.Level
 	switch strings.ToLower(logLevel) {
@@ -36,11 +38,13 @@ func Initialize(logLevel string) {
 	}
 
 	// Configure slog with a text handler
-	opts := slog.HandlerOptions{Level: slogLevel}
-	handler := slog.NewTextHandler(os.Stdout, &opts)
-	defaultLogger = slog.New(handler)
+	handler := pterm.NewSlogHandler(&pterm.DefaultLogger)
 
-	// Log initialization message
+	// Change the log level to debug to enable debug messages
+	pterm.DefaultLogger.Level = pterm.LogLevelDebug
+
+	// Create a new slog logger with the handler
+	defaultLogger = slog.New(handler)
 	defaultLogger.Debug("Logger initialized", "level", slogLevel.String())
 }
 
@@ -51,26 +55,31 @@ func Info(msg string, keysAndValues ...interface{}) {
 
 // Debug logs a debug message
 func Debug(msg string, keysAndValues ...interface{}) {
+
 	defaultLogger.Debug(msg, keysAndValues...)
+
 }
 
 // Warn logs a warning message
 func Warn(msg string, keysAndValues ...interface{}) {
 	defaultLogger.Warn(msg, keysAndValues...)
+
 }
 
 // Error logs an error message
 func Error(msg string, keysAndValues ...interface{}) {
 	defaultLogger.Error(msg, keysAndValues...)
+
 }
 
 // Fatal logs a fatal error message and exits the application
 func Fatal(msg string, keysAndValues ...interface{}) {
 	defaultLogger.Error(msg, keysAndValues...)
 	os.Exit(1)
+
 }
 
 func init() {
 	// Initialize the logger with the default log level
-	Initialize(viper.GetString("LOG_LEVEL"))
+	Initialize(viper.GetString("LOG_LEVEL"), false)
 }

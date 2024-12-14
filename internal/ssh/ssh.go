@@ -108,8 +108,8 @@ func GetSSHCommandArgs(app *config.Atun) []string {
 			args = append(args, "-o", "StrictHostKeyChecking=no")
 		}
 
-		// TODO: Add ability to support other instance types, not just ubuntu
-		args = append(args, fmt.Sprintf("ec2-user@%s", app.Config.BastionHostID))
+		// TODO: Add ability to support other instance types, not just AWS Linux
+		args = append(args, fmt.Sprintf("%s@%s", app.Config.BastionHostUser, app.Config.BastionHostID))
 		args = append(args, "-F", app.Config.SSHConfigFile)
 
 		if _, err := os.Stat(app.Config.SSHKeyPath); !os.IsNotExist(err) {

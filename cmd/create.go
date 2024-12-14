@@ -13,6 +13,7 @@ import (
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -30,9 +31,25 @@ var createCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 
+		//customTheme := pterm.Theme{
+		//	InfoPrefixStyle: *pterm.NewStyle(pterm.FgGreen),
+		//	//InfoPrefixStyle:  pterm.Prefix{Text: "i", Style: pterm.NewStyle(pterm.FgCyan)},
+		//	InfoMessageStyle: *pterm.NewStyle(pterm.FgCyan),
+		//}
+		//
+		//pterm.ThemeDefault = customTheme
+		//
+		//pterm.Info.Printfln("Creating EC2 Bastion Host")
+		//pterm.Printfln("Creating EC2 Bastion Host")
+
+		// Create and start a fork of the default spinner.
+		createBastionInstanceSpinner, _ := pterm.DefaultSpinner.Start("Creating EC2 Instance...")
+		//time.Sleep(time.Second * 2) // Simulate 3 seconds of processing something.
+
 		// Check if the configuration is loaded
 		if config.App.Config != nil {
 			logger.Debug("App config file exists. Checking Hosts Config")
+			pterm.Debug.Printfln("App config file exists. Checking Hosts Config")
 
 			// If config is not loaded, offer to create a new configuration using survey package
 			if len(config.App.Config.Hosts) == 0 {
@@ -41,6 +58,7 @@ var createCmd = &cobra.Command{
 
 				err = buildHostConfig(config.App)
 				if err != nil {
+					createBastionInstanceSpinner.Fail("Error creating host config: %v", err)
 					logger.Error("Error creating host config: %v", err)
 				}
 
@@ -70,6 +88,7 @@ var createCmd = &cobra.Command{
 			logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", config.App.Config.BastionSubnetID)
 			config.App.Config.BastionVPCID, err = aws.GetVPCIDFromSubnet(config.App.Config.BastionSubnetID)
 			if err != nil {
+				createBastionInstanceSpinner.Fail("Error getting VPC ID from Subnet ID", err)
 				logger.Fatal("Error getting VPC ID from Subnet ID", "err", err)
 			}
 		}
@@ -78,17 +97,20 @@ var createCmd = &cobra.Command{
 		// Apply the configuration using CDKTF
 		err = infra.ApplyCDKTF(config.App.Config)
 		if err != nil {
+			createBastionInstanceSpinner.Fail("Error running CDKTF", err)
 			logger.Error("Error running CDKTF", "err", err)
 			return err
 		}
 
 		logger.Info("CDKTF stack applied successfully")
+		createBastionInstanceSpinner.Success()
+
 		return nil
 	},
 }
 
 func init() {
-	logger.Debug("Init add command")
+	logger.Debug("Init create command")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

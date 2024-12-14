@@ -39,9 +39,11 @@ type Config struct {
 	BastionHostID            string
 	BastionInstanceName      string
 	BastionHostAMI           string
+	BastionHostUser          string
 	AppDir                   string
 	TunnelDir                string
 	LogLevel                 string
+	LogPlainText             bool
 	Env                      string
 	AutoAllocatePort         bool
 }
@@ -74,8 +76,8 @@ func LoadConfig() error {
 	// Set default log level early
 	viper.SetDefault("LOG_LEVEL", "info")
 
-	// Initialize the logger for a bit to provide early logging
-	logger.Initialize(viper.GetString("LOG_LEVEL"))
+	// Initialize the logger for a bit to provide early logging (using viper defaults)
+	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -105,8 +107,8 @@ func LoadConfig() error {
 		logger.Debug("Using config file:", "configFile", viper.ConfigFileUsed())
 	}
 
-	// Initialize the logger after config is read (second time)
-	logger.Initialize(viper.GetString("LOG_LEVEL"))
+	// Initialize the logger after config is read (second time, getting log level and plain text setting from config)
+	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
 
 	// Use AWS_PROFILE env var as a default for viper AWS_PROFILE
 	if viper.GetString("ENV") == "" {
@@ -146,8 +148,10 @@ func LoadConfig() error {
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", true)
 	viper.SetDefault("AWS_INSTANCE_TYPE", "t3.nano")
 	viper.SetDefault("BASTION_INSTANCE_NAME", "atun-bastion")
+	viper.SetDefault("BASTION_HOST_USER", "ec2-user")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
+	viper.SetDefault("LOG_PLAIN_TEXT", false)
 
 	// TODO?: Move init a separate file with correct imports of config
 	App = &Atun{
@@ -167,9 +171,11 @@ func LoadConfig() error {
 			BastionHostID:            viper.GetString("BASTION_HOST_ID"),
 			BastionInstanceName:      viper.GetString("BASTION_INSTANCE_NAME"),
 			BastionHostAMI:           viper.GetString("BASTION_HOST_AMI"),
+			BastionHostUser:          viper.GetString("BASTION_HOST_USER"),
 			ConfigFile:               viper.ConfigFileUsed(),
 			AppDir:                   appDir,
 			LogLevel:                 viper.GetString("LOG_LEVEL"),
+			LogPlainText:             viper.GetBool("LOG_PLAIN_TEXT"),
 			AutoAllocatePort:         viper.GetBool("AUTO_ALLOCATE_PORT"),
 		},
 		Session: nil,
