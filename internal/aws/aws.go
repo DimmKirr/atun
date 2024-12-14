@@ -22,7 +22,7 @@ import (
 )
 
 func InitAWSClients(app *config.Atun) {
-	logger.Debug("Authenticating to AWS", "profile", app.Config.AWSProfile, "region", app.Config.AWSRegion)
+	logger.Debug("Authenticating with AWS", "profile", app.Config.AWSProfile, "region", app.Config.AWSRegion)
 	// Ensure all constraints are met
 	if err := constraints.CheckConstraints(
 		constraints.WithAWSProfile(),
@@ -39,7 +39,7 @@ func InitAWSClients(app *config.Atun) {
 		EndpointUrl: app.Config.AWSEndpointUrl,
 	})
 	if err != nil {
-		panic(err)
+		logger.Fatal("Failed to initialize AWS session", "error", err)
 	}
 
 	logger.Debug("AWS Session initialized")
@@ -171,18 +171,22 @@ func GetAccountId() string {
 	return *result.Account
 }
 
-func SendSSHPublicKey(instanceID string, publicKey string) error {
+func SendSSHPublicKey(instanceID string, publicKey string, bastionHostUser string) error {
 	// This command is executed in the bastion host and it checks if our public publicKey is present. If it's not it uploads it to the authorized_keys file.
+	// If the bastionHostUser is "root" then set bastionHostUserDirectory to /root otherwise set it to /home/bastionHostUser
+	bastionHostUserDirectory := fmt.Sprintf("/home/%s", bastionHostUser)
+	if bastionHostUser == "root" {
+		bastionHostUserDirectory = "/root"
+	}
+
 	command := fmt.Sprintf(
-		`mkdir -p /home/ec2-user/.ssh/ && touch /home/ec2-user/.ssh/authorized_keys && grep -qR "%s" /home/ec2-user/.ssh/authorized_keys || echo "%s" | tee -a /home/ec2-user/.ssh/authorized_keys`,
-		strings.TrimSpace(publicKey), strings.TrimSpace(publicKey),
+		`bash -c 'mkdir -p %s/.ssh && grep --qR "%s" %s/.ssh/authorized_keys || echo "%s" >> %s/.ssh/authorized_keys'`,
+		bastionHostUserDirectory,
+		strings.TrimSpace(publicKey),
+		bastionHostUserDirectory,
+		strings.TrimSpace(publicKey),
+		bastionHostUserDirectory,
 	)
-
-	//command := fmt.Sprintf(
-	//	`whoami`,
-	//)
-
-	//command := `whoami`
 
 	logger.Debug("Sending command", "command", command)
 

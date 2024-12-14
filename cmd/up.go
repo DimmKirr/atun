@@ -139,7 +139,7 @@ var upCmd = &cobra.Command{
 		logger.Debug("Public key", "key", publicKey)
 
 		// Send the public key to the bastion instance
-		err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey)
+		err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
 		if err != nil {
 			logger.Fatal("Error adding local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
 			os.Exit(1)
