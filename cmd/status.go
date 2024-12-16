@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
+	"github.com/automationd/atun/internal/logger"
+	"github.com/automationd/atun/internal/tunnel"
 
 	"github.com/pterm/pterm"
 	"os"
@@ -25,6 +27,7 @@ var statusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: Implement Tunnel Status
 
+		logger.Debug("Status command called")
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("can't load options for a command: %w", err)
@@ -33,6 +36,11 @@ var statusCmd = &cobra.Command{
 		dt := pterm.DefaultTable
 
 		aws.InitAWSClients(config.App)
+
+		config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+		if err != nil {
+			logger.Error("Bastion host not found. You might want to create it.", "error", err)
+		}
 
 		// TODO: Hide this info behind --debug flag or move to a `debug` command
 		pterm.DefaultSection.Println("Status")
@@ -44,11 +52,12 @@ var statusCmd = &cobra.Command{
 			{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
 			{"Config File", config.App.Config.ConfigFile},
 			{"Bastion Host", config.App.Config.BastionHostID},
+			{"Log Level", config.App.Config.LogLevel},
 
 			//{"Toggle", toggleValue},
 		}).WithLeftAlignment().Render()
-
-		return err
+		logger.Debug("Status command finished")
+		return nil
 	},
 }
 

@@ -58,6 +58,7 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 	}
 
 	if c.Region == "" {
+		logger.Debug("Region is not set, trying to get it from the credentials file", "profile", c.Profile)
 		c.Region = profile.Key("region").String()
 	}
 

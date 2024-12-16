@@ -6,12 +6,15 @@
 package cmd
 
 import (
+	"fmt"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -33,13 +36,22 @@ var upCmd = &cobra.Command{
 		if err := constraints.CheckConstraints(
 			constraints.WithSSMPlugin(),
 			constraints.WithAWSProfile(),
-			constraints.WithAWSRegion(),
+			//constraints.WithAWSRegion(), // Can be derived on the session level
 			constraints.WithENV(),
 		); err != nil {
 			return err
 		}
 
 		logger.Debug("All constraints satisfied")
+		var upTunnelSpinner *pterm.SpinnerPrinter
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+
+		if showSpinner {
+			upTunnelSpinner, _ = pterm.DefaultSpinner.Start("Starting tunnel via bastion host %s...")
+		} else {
+			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
+			logger.Info("Starting tunnel via EC2 Bastion Instance...")
+		}
 
 		aws.InitAWSClients(config.App)
 
@@ -52,36 +64,40 @@ var upCmd = &cobra.Command{
 		if bastionHost == "" {
 			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
 			if err != nil {
-				logger.Error("Error discovering bastion host. You might need to run `atun create` command first", "error", err)
-				os.Exit(1)
+				logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
+
+				// Use survey to ask if the user wants to create a bastion host
+				createHost := false
+				err = survey.AskOne(&survey.Confirm{
+					Message: fmt.Sprintf("Would you like to create an ad-hoc bastion host? (It's easy to cleanly delete)"),
+					Default: true,
+				}, &createHost)
+				if err != nil {
+					logger.Fatal("Error getting confirmation:", err)
+					return err
+				}
+
+				if !createHost {
+					logger.Info("Bastion host creation cancelled. Exiting.")
+					os.Exit(1)
+				}
+
+				// Run create command from here
+				err := createCmd.RunE(createCmd, args)
+				if err != nil {
+					return fmt.Errorf("error running createCmd: %w", err)
+				}
+
+				logger.Debug("Created host")
+
+				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
 
 				// TODO: suggest creating a bastion host.
 				// Use survey to ask if the user wants to create a bastion host
 				// If yes, run the create command
 				// If no, return
 
-				//createHost := false
-				//err = survey.AskOne(&survey.Confirm{
-				//	Message: fmt.Sprintf("Would you like to create a bastion host?"),
-				//	Default: true,
-				//}, &createHost)
-				//if err != nil {
-				//	logger.Fatal("Error getting confirmation:", err)
-				//	return err
-				//}
-				//
-				//if !createHost {
-				//	logger.Info("Bastion host creation cancelled. Exiting.")
-				//	os.Exit(0)
-				//}
-				//
-				//// Run create command from here
-				//createCmd := &cobra.Command{}
-				//createCmd.SetArgs([]string{"create"})
-				//if err := createCmd.Execute(); err != nil {
-				//	logger.Fatal("Error executing create command:", err)
-				//	return err
-				//}
 			}
 		} else {
 			config.App.Config.BastionHostID = bastionHost
@@ -138,11 +154,28 @@ var upCmd = &cobra.Command{
 
 		logger.Debug("Public key", "key", publicKey)
 
+		// Wait until the instance is running
+
+		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
+		if err != nil {
+			if showSpinner {
+				upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance")
+			} else {
+				logger.Fatal("Error waiting for instance to be running", "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				os.Exit(1)
+			}
+		}
+
 		// Send the public key to the bastion instance
 		err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
 		if err != nil {
-			logger.Fatal("Error adding local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
-			os.Exit(1)
+			if showSpinner {
+				upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance")
+			} else {
+				logger.Fatal("Error adding local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				os.Exit(1)
+			}
+
 		}
 
 		logger.Debug("Public key sent to bastion host", "bastion", config.App.Config.BastionHostID)
@@ -155,7 +188,11 @@ var upCmd = &cobra.Command{
 
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
 
-		logger.Info("Tunnel is up! Forwarded ports:", "connectionInfo", connectionInfo)
+		if showSpinner {
+			upTunnelSpinner.Success(fmt.Sprintf("Tunnel is up! Forwarded ports: %s", connectionInfo))
+		} else {
+			logger.Info("Tunnel is up! Forwarded ports:", "connectionInfo", connectionInfo)
+		}
 
 		return nil
 	},

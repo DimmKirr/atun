@@ -9,6 +9,7 @@ import (
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -22,18 +23,38 @@ var deleteCmd = &cobra.Command{
 
 		// TODO: Add survey to check if the user is sure to destroy the stack
 
+		var deleteBastionInstanceSpinner *pterm.SpinnerPrinter
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+
+		if showSpinner {
+			deleteBastionInstanceSpinner, _ = pterm.DefaultSpinner.Start("Deleting Ad-Hoc EC2 Bastion Instance...")
+		} else {
+			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
+			logger.Info("Deleting Ad-Hoc EC2 Bastion Instance...")
+		}
+
 		aws.InitAWSClients(config.App)
 
 		err := infra.DestroyCDKTF(config.App.Config)
 		if err != nil {
+			if showSpinner {
+				deleteBastionInstanceSpinner.Fail("Failed to delete Bastion Ad-Hoc Instance")
+			} else {
+				logger.Error("Failed to delete Bastion Ad-Hoc Instance")
+			}
 			logger.Error("Error running CDKTF", "error", err)
 			return
+		}
 
+		if showSpinner {
+			deleteBastionInstanceSpinner.Success("Bastion Ad-Hoc Instance deleted successfully")
+		} else {
+			logger.Info("Bastion Ad-Hoc Instance deleted successfully")
 		}
 		logger.Info("CDKTF stack destroyed successfully")
 	},
 }
 
 func init() {
-	//rootCmd.AddCommand(deleteCmd)
+	logger.Debug("Init delete command")
 }

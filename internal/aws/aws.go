@@ -7,12 +7,16 @@ package aws
 
 import (
 	"fmt"
+
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elasticache"
+	"github.com/aws/aws-sdk-go/service/opensearchservice"
+	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/pterm/pterm"
@@ -26,7 +30,7 @@ func InitAWSClients(app *config.Atun) {
 	// Ensure all constraints are met
 	if err := constraints.CheckConstraints(
 		constraints.WithAWSProfile(),
-		constraints.WithAWSRegion(),
+		//constraints.WithAWSRegion(),
 	); err != nil {
 		pterm.Error.Println("Failed to check constraints:", err)
 		os.Exit(1)
@@ -40,6 +44,10 @@ func InitAWSClients(app *config.Atun) {
 	})
 	if err != nil {
 		logger.Fatal("Failed to initialize AWS session", "error", err)
+	}
+	if config.App.Config.AWSRegion == "" {
+		logger.Debug("AWS Region not set. Setting it to the default value", "region", *sess.Config.Region)
+		config.App.Config.AWSRegion = *sess.Config.Region
 	}
 
 	logger.Debug("AWS Session initialized")
@@ -60,6 +68,22 @@ func NewEC2Client(awsConfig aws.Config) (*ec2.EC2, error) {
 	ec2Client := ec2.New(sess)
 
 	return ec2Client, nil
+}
+
+func NewRDSClient(awsConfig aws.Config) (*rds.RDS, error) {
+	logger.Debug("Creating RDS client.", "AWSProfile", config.App.Config.AWSProfile, "awsRegion", config.App.Config.AWSRegion, "endpointURL", awsConfig.Endpoint)
+
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Config:            awsConfig,
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rdsClient := rds.New(sess)
+
+	return rdsClient, nil
 }
 
 func NewSTSClient(awsConfig aws.Config) (*sts.STS, error) {
@@ -262,4 +286,185 @@ func GetVPCIDFromSubnet(subnetID string) (string, error) {
 	}
 
 	return *result.Subnets[0].VpcId, nil
+}
+
+// GetAvailableSubnets returns a list of available subnets in AWS Account (in all VPCs)
+func GetAvailableSubnets() ([]*ec2.Subnet, error) {
+	ec2Client, err := NewEC2Client(*config.App.Session.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	input := &ec2.DescribeSubnetsInput{}
+
+	var subnets []*ec2.Subnet
+	err = ec2Client.DescribeSubnetsPages(input, func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
+		subnets = append(subnets, page.Subnets...)
+		return !lastPage
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return subnets, nil
+}
+
+// GetAvailableKeyPairs returns a list of available key pairs in AWS Account
+func GetAvailableKeyPairs() ([]*ec2.KeyPairInfo, error) {
+	ec2Client, err := NewEC2Client(*config.App.Session.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	input := &ec2.DescribeKeyPairsInput{}
+
+	result, err := ec2Client.DescribeKeyPairs(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.KeyPairs, nil
+}
+
+// InferPortByHost finds the remote port of a service (RDS, ElastiCache, OpenSearch) by matching its endpoint hostname.
+func InferPortByHost(host string) (int, error) {
+	// Check RDS clusters
+	if port, err := inferPortFromRDS(host); err == nil {
+		return port, nil
+	}
+
+	// Check ElastiCache clusters (Redis/Memcached)
+	if port, err := inferPortFromElastiCache(host); err == nil {
+		return port, nil
+	}
+
+	// Check OpenSearch clusters
+	if port, err := inferPortFromOpenSearch(host); err == nil {
+		return port, nil
+	}
+
+	return 0, fmt.Errorf("no matching service found with endpoint hostname: %s", host)
+}
+
+// inferPortFromRDS checks RDS clusters for a matching endpoint and returns its port.
+func inferPortFromRDS(host string) (int, error) {
+	rdsClient, err := NewRDSClient(*config.App.Session.Config)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create RDS client: %v", err)
+	}
+
+	var clusters []*rds.DBCluster
+	err = rdsClient.DescribeDBClustersPages(&rds.DescribeDBClustersInput{},
+		func(page *rds.DescribeDBClustersOutput, lastPage bool) bool {
+			clusters = append(clusters, page.DBClusters...)
+			return !lastPage
+		})
+	if err != nil {
+		return 0, fmt.Errorf("failed to describe RDS clusters: %v", err)
+	}
+
+	for _, cluster := range clusters {
+		if cluster.Endpoint != nil && strings.EqualFold(*cluster.Endpoint, host) {
+			return int(*cluster.Port), nil
+		}
+	}
+	return 0, fmt.Errorf("no RDS cluster found with endpoint hostname: %s", host)
+}
+
+// inferPortFromElastiCache checks ElastiCache clusters (Redis and Memcached) for a matching endpoint and returns its port.
+func inferPortFromElastiCache(host string) (int, error) {
+	elastiCacheClient := elasticache.New(session.New()) // Initialize ElastiCache client
+	input := &elasticache.DescribeCacheClustersInput{
+		ShowCacheNodeInfo: aws.Bool(true),
+	}
+
+	var clusters []*elasticache.CacheCluster
+	err := elastiCacheClient.DescribeCacheClustersPages(input,
+		func(page *elasticache.DescribeCacheClustersOutput, lastPage bool) bool {
+			clusters = append(clusters, page.CacheClusters...)
+			return !lastPage
+		})
+	if err != nil {
+		return 0, fmt.Errorf("failed to describe ElastiCache clusters: %v", err)
+	}
+
+	for _, cluster := range clusters {
+		for _, node := range cluster.CacheNodes {
+			if node.Endpoint != nil && strings.EqualFold(*node.Endpoint.Address, host) {
+				return int(*node.Endpoint.Port), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("no ElastiCache cluster found with endpoint hostname: %s", host)
+}
+
+// inferPortFromOpenSearch checks OpenSearch domains for a matching endpoint and returns the default port (443 for HTTPS).
+func inferPortFromOpenSearch(host string) (int, error) {
+	osClient := opensearchservice.New(session.New()) // Initialize OpenSearch client
+
+	var domains []*opensearchservice.DomainStatus
+	input := &opensearchservice.DescribeDomainsInput{
+		DomainNames: []*string{}, // Will fetch all domains in the next step
+	}
+
+	// Get all OpenSearch domain names first
+	domainsList, err := osClient.ListDomainNames(&opensearchservice.ListDomainNamesInput{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list OpenSearch domains: %v", err)
+	}
+	for _, domain := range domainsList.DomainNames {
+		input.DomainNames = append(input.DomainNames, domain.DomainName)
+	}
+
+	// Describe each domain to find endpoint information
+	output, err := osClient.DescribeDomains(input)
+	if err != nil {
+		return 0, fmt.Errorf("failed to describe OpenSearch domains: %v", err)
+	}
+
+	domains = output.DomainStatusList
+	for _, domain := range domains {
+		if domain.Endpoint != nil && strings.EqualFold(*domain.Endpoint, host) {
+			// OpenSearch usually listens on HTTPS (port 443)
+			return 443, nil
+		}
+	}
+	return 0, fmt.Errorf("no OpenSearch domain found with endpoint hostname: %s", host)
+}
+
+func WaitForInstanceReady(instanceID string) error {
+	ec2Client, err := NewEC2Client(*config.App.Session.Config)
+	if err != nil {
+		return err
+	}
+
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{&instanceID},
+	}
+
+	err = ec2Client.WaitUntilInstanceRunning(input)
+	if err != nil {
+		return err
+	}
+
+	ssmClient := ssm.New(config.App.Session)
+	ssmInput := &ssm.DescribeInstanceInformationInput{
+		InstanceInformationFilterList: []*ssm.InstanceInformationFilter{
+			{
+				Key:      aws.String("InstanceIds"),
+				ValueSet: []*string{aws.String(instanceID)},
+			},
+		},
+	}
+
+	ssmOutput, err := ssmClient.DescribeInstanceInformation(ssmInput)
+	if err != nil {
+		return fmt.Errorf("error describing instance information: %w", err)
+	}
+
+	if len(ssmOutput.InstanceInformationList) == 0 || *ssmOutput.InstanceInformationList[0].PingStatus != "Online" {
+		return fmt.Errorf("SSM agent is not active or inaccessible on instance %s. Does the subnet have Internet (via NAT)?", instanceID)
+	}
+
+	return nil
 }

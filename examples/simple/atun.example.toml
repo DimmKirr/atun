@@ -1,9 +1,10 @@
 # This is a sample config file that is used when atun cli is ued to deploy a Bastion Host.
 # It's not required when connecting to an existing Bastion Host that is tagged with atun-compatible tags.
 
-aws_profile="localstack"
+#aws_profile="localstack"
 aws_region="us-east-1"
-bastion_subne_id="subnet-xxxxxxxxxxxxxxxx"
+#bastion_subnet_id="subnet-xxxxxxxxxxxxxxxx"
+#bastion_subnet_id="subnet-77c1c72b"
 
 [[hosts]]
 name = "ipconfig.io"
