@@ -35,43 +35,57 @@ var downCmd = &cobra.Command{
 		//	return err
 		//}
 
-		bastionHost = cmd.Flag("bastion").Value.String()
-
 		var downTunnelSpinner *pterm.SpinnerPrinter
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
+		tunnelStarted, err := ssh.GetTunnelStatus(config.App)
+		if err != nil {
+			logger.Error("Failed to get tunnel status", "error", err)
+		}
+
 		if showSpinner {
-			downTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Stopping tunnel via bastion host %s...", config.App.Config.BastionHostID))
+			downTunnelSpinner, _ = pterm.DefaultSpinner.Start("Stopping tunnel...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
-			logger.Info("Stopping tunnel via EC2 Bastion Instance...")
+			logger.Info("Stopping tunnel...")
 		}
+		logger.Debug("Tunnel status", "status", tunnelStarted)
 
-		aws.InitAWSClients(config.App)
+		if tunnelStarted {
+			bastionHost = cmd.Flag("bastion").Value.String()
 
-		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
-		if bastionHost == "" {
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
-			if err != nil {
-				logger.Fatal("Error discovering bastion host", "error", err)
+			if showSpinner {
+				downTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Stopping tunnel via bastion host %s...", config.App.Config.BastionHostID))
+			} else {
+				logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
+				logger.Info("Stopping tunnel via EC2 Bastion Instance...")
 			}
-		} else {
-			config.App.Config.BastionHostID = bastionHost
+
+			aws.InitAWSClients(config.App)
+
+			// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
+			if bastionHost == "" {
+				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				if err != nil {
+					logger.Fatal("Error discovering bastion host", "error", err)
+				}
+			} else {
+				config.App.Config.BastionHostID = bastionHost
+			}
+
+			logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
+
+			logger.Debug("All constraints satisfied")
+
+			tunnelStarted, err = ssh.StopTunnel(config.App)
+			if err != nil {
+				logger.Error("Failed to stop tunnel", "error", err)
+			}
 		}
-
-		logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-
-		logger.Debug("All constraints satisfied")
-
-		tunnelStatus, err := ssh.StopTunnel(config.App)
-		if err != nil {
-			logger.Error("Failed to stop tunnel", "error", err)
-		}
-
 		if showSpinner {
 			downTunnelSpinner.Success("Tunnel stopped")
 		} else {
-			logger.Debug("Tunnel status", "status", tunnelStatus)
+			logger.Debug("Tunnel status", "status", tunnelStarted)
 		}
 
 		// Get delete flag
