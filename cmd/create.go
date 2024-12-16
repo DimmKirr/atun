@@ -13,11 +13,11 @@ import (
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
+	"github.com/automationd/atun/internal/tunnel"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 )
 
@@ -31,42 +31,47 @@ var createCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 
-		//customTheme := pterm.Theme{
-		//	InfoPrefixStyle: *pterm.NewStyle(pterm.FgGreen),
-		//	//InfoPrefixStyle:  pterm.Prefix{Text: "i", Style: pterm.NewStyle(pterm.FgCyan)},
-		//	InfoMessageStyle: *pterm.NewStyle(pterm.FgCyan),
-		//}
-		//
-		//pterm.ThemeDefault = customTheme
-		//
-		//pterm.Info.Printfln("Creating EC2 Bastion Host")
-		//pterm.Printfln("Creating EC2 Bastion Host")
-
-		// Create and start a fork of the default spinner.
-		createBastionInstanceSpinner, _ := pterm.DefaultSpinner.Start("Creating EC2 Instance...")
-		//time.Sleep(time.Second * 2) // Simulate 3 seconds of processing something.
+		aws.InitAWSClients(config.App)
 
 		// Check if the configuration is loaded
 		if config.App.Config != nil {
-			logger.Debug("App config file exists. Checking Hosts Config")
-			pterm.Debug.Printfln("App config file exists. Checking Hosts Config")
+			logger.Debug("App config exists (via file, env vars or else). Checking Hosts Config")
 
 			// If config is not loaded, offer to create a new configuration using survey package
 			if len(config.App.Config.Hosts) == 0 {
-				logger.Debug(
-					"No hosts found in the configuration. Offering to create one")
+				logger.Warn(
+					"No hosts found in the configuration.")
 
 				err = buildHostConfig(config.App)
 				if err != nil {
-					createBastionInstanceSpinner.Fail("Error creating host config: %v", err)
 					logger.Error("Error creating host config: %v", err)
 				}
 
-				// TODO: Save config file
+				// Use Survey to ask if the user wants to save the configuration
+				saveConfig := true
+				err = survey.AskOne(&survey.Confirm{
+					Message: "Would you like to save the configuration?",
+					Default: saveConfig,
+				}, &saveConfig)
+				if err != nil {
+					logger.Fatal("Error getting confirmation:", "err", err)
+				}
+
+				if saveConfig {
+					// Save the configuration to the file
+					err = config.SaveConfig()
+					if err != nil {
+						logger.Error("Error saving the configuration", "err", err)
+					}
+					logger.Info("Hosts Config saved.", "hosts", config.App.Config.Hosts)
+
+				}
 
 			}
 			// TODO: Check for Subnet ID and if not ask for them
 			logger.Debug("Hosts Config exists.", "hosts", config.App.Config.Hosts)
+		} else {
+			logger.Warn("No configuration file found.")
 		}
 
 		// Verify all constraints are met
@@ -80,20 +85,58 @@ var createCmd = &cobra.Command{
 			return err
 		}
 
-		aws.InitAWSClients(config.App)
-
 		// TODO: Abstract this into a separate function since it's used in multiple places
 		// Get VPC ID from Subnet ID if it's not populated
 		if config.App.Config.BastionVPCID == "" {
+			if config.App.Config.BastionSubnetID == "" {
+				logger.Info("No Subnet ID provided. Asking for it.")
+				// Get list of subnets in the account (via GetAvailableSubnets) and ask the user to pick one with survey
+				subnets, err := aws.GetAvailableSubnets()
+				if err != nil {
+					logger.Fatal("Error getting available subnets", "err", err)
+				}
+
+				// Ask user to pick a subnet
+				err = survey.AskOne(&survey.Select{
+					Message: "Select Subnet ID:",
+					Options: func() []string {
+						var options []string
+						for _, subnet := range subnets {
+							options = append(options, *subnet.SubnetId)
+						}
+						return options
+					}(),
+					Description: func(value string, index int) string {
+						var name string
+						for _, tag := range subnets[index].Tags {
+							if *tag.Key == "Name" {
+								name = *tag.Value
+							}
+
+						}
+						return fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
+					},
+				}, &config.App.Config.BastionSubnetID, survey.WithValidator(survey.Required))
+			}
+
 			logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", config.App.Config.BastionSubnetID)
 			config.App.Config.BastionVPCID, err = aws.GetVPCIDFromSubnet(config.App.Config.BastionSubnetID)
 			if err != nil {
-				createBastionInstanceSpinner.Fail("Error getting VPC ID from Subnet ID", err)
 				logger.Fatal("Error getting VPC ID from Subnet ID", "err", err)
 			}
 		}
 		logger.Debug("Obtained VPC ID from the Subnet ID", "BastionVPCID", config.App.Config.BastionVPCID)
 
+		// Create and start a fork of the default spinner.
+		var createBastionInstanceSpinner *pterm.SpinnerPrinter
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+
+		if showSpinner {
+			createBastionInstanceSpinner, _ = pterm.DefaultSpinner.Start("Creating Ad-Hoc EC2 Bastion Instance...")
+		} else {
+			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
+			logger.Info("Creating Ad-Hoc EC2 Bastion Instance...")
+		}
 		// Apply the configuration using CDKTF
 		err = infra.ApplyCDKTF(config.App.Config)
 		if err != nil {
@@ -102,8 +145,11 @@ var createCmd = &cobra.Command{
 			return err
 		}
 
-		logger.Info("CDKTF stack applied successfully")
-		createBastionInstanceSpinner.Success()
+		if showSpinner {
+			createBastionInstanceSpinner.Success()
+		} else {
+			logger.Info("CDKTF stack applied successfully")
+		}
 
 		return nil
 	},
@@ -141,7 +187,7 @@ func buildHostConfig(app *config.Atun) error {
 		Default: true,
 	}, &startSurvey)
 	if err != nil {
-		logger.Fatal("Error getting confirmation:", err)
+		logger.Fatal("Error getting confirmation:", "err", err)
 		return err
 	}
 
@@ -150,34 +196,63 @@ func buildHostConfig(app *config.Atun) error {
 		os.Exit(0)
 	}
 
+	aws.InitAWSClients(config.App)
+
+	// Get list of subnets in the account (via GetAvailableSubnets) to use as default values
+	subnets, err := aws.GetAvailableSubnets()
+	if err != nil {
+		log.Fatalf("Error getting available subnets: %v", err)
+		return err
+	}
+
 	// Prompt for Subnet ID using survey with validation
-	err = survey.AskOne(&survey.Input{
-		Message: "Enter AWS Subnet ID:",
-		Default: app.Config.BastionSubnetID,
-	}, &app.Config.BastionSubnetID, survey.WithValidator(survey.ComposeValidators(
-		survey.Required,
-		func(val interface{}) error {
-			str, ok := val.(string)
-			if !ok {
-				return fmt.Errorf("invalid input")
+	err = survey.AskOne(&survey.Select{
+		Message: "Select AWS Subnet ID:",
+		Options: func() []string {
+			var options []string
+			for _, subnet := range subnets {
+				options = append(options, *subnet.SubnetId)
 			}
-			if !regexp.MustCompile(`^subnet-[0-9a-f]{8,17}$`).MatchString(str) {
-				return fmt.Errorf("unexpected subnet ID format, expected subnet-xxxxxxxxxxxxxx")
+			return options
+		}(),
+		Description: func(value string, index int) string {
+			var name string
+			for _, tag := range subnets[index].Tags {
+				if *tag.Key == "Name" {
+					name = *tag.Value
+				}
 			}
-			return nil
+			return fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
 		},
-	)))
+	}, &app.Config.BastionSubnetID, survey.WithValidator(survey.Required))
 	if err != nil {
 		log.Fatalf("Error getting Subnet ID: %v", err)
 		return err
 	}
 
-	err = survey.AskOne(&survey.Input{
-		Message: "Enter AWS Key Pair (must exist):",
-		Default: app.Config.AWSKeyPair, // If there is value from config we'll use it as a default, if not it will be empty
+	// Get list of key pairs in the account
+	keyPairs, err := aws.GetAvailableKeyPairs()
+	if err != nil {
+		log.Fatalf("Error getting available key pairs: %v", err)
+		return err
+	}
+
+	// Ask user to pick a key pair
+	err = survey.AskOne(&survey.Select{
+		Message: "Select AWS Key Pair:",
+		Options: func() []string {
+			var options []string
+			for _, keyPair := range keyPairs {
+				options = append(options, *keyPair.KeyName)
+			}
+			return options
+		}(),
+		Description: func(value string, index int) string {
+			return fmt.Sprintf("(Created on %s, Signature: %s)", *keyPairs[index].CreateTime, *keyPairs[index].KeyFingerprint)
+		},
 	}, &app.Config.AWSKeyPair, survey.WithValidator(survey.Required))
 	if err != nil {
-		log.Fatalf("Error getting Subnet ID: %v", err)
+		log.Fatalf("Error getting AWS Key Pair: %v", err)
 		return err
 	}
 
@@ -269,14 +344,26 @@ func buildHostConfig(app *config.Atun) error {
 			logger.Fatal("Sorry, only SSM is supported for now, but it's on the roadmap. Back to the matrix 💊")
 		}
 
-		// TODO: Detect remote port by the host name (if it's RDS mySQL use 3306, if it's RDS PostgreSQL use 5432)
+		rp, err := aws.InferPortByHost(host.Name)
+		if err != nil {
+			logger.Debug("Error inferring port from the host", "host", host, "error", err)
+		} else {
+			logger.Debug("Inferred remote port from the host", "host", host, "port", rp)
+			defaultRemotePort = strconv.Itoa(rp)
+
+			lp, err := tunnel.CalculateLocalPort(rp)
+			defaultLocalPort = strconv.Itoa(lp)
+			if err != nil {
+				logger.Fatal("Error calculating local port", "error", err)
+			}
+		}
 
 		// Survey produces a string, so we need to convert it to int later
 		var remotePortSurveyAnswer string
 
 		// Ask for host remote port
 		err = survey.AskOne(&survey.Input{
-			Message: "Enter Host Remote Port \n(MySQL: 3306, PostgreSQL: 5432)",
+			Message: "Enter Host Remote Port",
 			Default: defaultRemotePort,
 		}, &remotePortSurveyAnswer, survey.WithValidator(survey.Required))
 		if err != nil {
@@ -295,7 +382,7 @@ func buildHostConfig(app *config.Atun) error {
 
 		// Ask for host local port
 		err = survey.AskOne(&survey.Input{
-			Message: "Enter a free local port on your machine (0 for automatic):",
+			Message: "Enter a free local port on your machine:",
 			Default: defaultLocalPort,
 		}, &localPortSurveyAnswer, survey.WithValidator(survey.Required))
 		if err != nil {

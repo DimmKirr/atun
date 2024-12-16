@@ -165,30 +165,35 @@ func ApplyCDKTF(c *config.Config) error {
 	synthDir := filepath.Join(c.TunnelDir, "stacks", fmt.Sprintf("%s-%s", c.AWSProfile, c.Env))
 	cmd := exec.Command("terraform", "init")
 	cmd.Dir = synthDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if c.LogLevel == "info" || c.LogLevel == "debug" {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
 	// TODO: Manage Terraform / OpenTofu Install
-
 	cmd = exec.Command("terraform", "apply", "-auto-approve")
 	cmd.Dir = synthDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if c.LogLevel == "info" || c.LogLevel == "debug" {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+
 	return cmd.Run()
 }
 
-// DestroyCDKTF performs the 'destroy' of the CDKTF stack
 func DestroyCDKTF(c *config.Config) error {
 	createStack(c)
 	// Change to the synthesized directory
 	synthDir := filepath.Join(c.TunnelDir, "stacks", fmt.Sprintf("%s-%s", c.AWSProfile, c.Env))
 	cmd := exec.Command("terraform", "init")
 	cmd.Dir = synthDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if c.LogLevel == "info" || c.LogLevel == "debug" {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	if err := cmd.Run(); err != nil {
 		return err
 	}
@@ -196,7 +201,9 @@ func DestroyCDKTF(c *config.Config) error {
 	// TODO: Manage Install Terraform
 	cmd = exec.Command("terraform", "destroy", "-auto-approve")
 	cmd.Dir = synthDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if c.LogLevel == "info" || c.LogLevel == "debug" {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	return cmd.Run()
 }

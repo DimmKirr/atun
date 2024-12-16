@@ -74,10 +74,11 @@ func LoadConfig() error {
 	viper.SetConfigType("toml")
 
 	// Set default log level early
-	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("LOG_LEVEL", "warning")
 
 	// Initialize the logger for a bit to provide early logging (using viper defaults)
 	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
+	logger.Debug("Initialized config")
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -110,7 +111,7 @@ func LoadConfig() error {
 	// Initialize the logger after config is read (second time, getting log level and plain text setting from config)
 	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
 
-	// Use AWS_PROFILE env var as a default for viper AWS_PROFILE
+	// Use ENV env var as a default for viper ENV
 	if viper.GetString("ENV") == "" {
 		if len(os.Getenv("ENV")) > 0 {
 			viper.SetDefault("ENV", os.Getenv("ENV"))
@@ -198,5 +199,34 @@ func LoadConfig() error {
 	//pterm.Printfln("Config: %v", App.Config)
 
 	// TODO?: Maybe search for bastion host id during config stage?
+	return nil
+}
+
+func SaveConfig() error {
+	// Save the config file to the current working directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		logger.Error("Error getting current directory", "error", err)
+		return err
+	}
+
+	configFilePath := filepath.Join(currentDir, "atun.toml")
+
+	// TODO: Possibly find a better way to marshal the whole config
+	// Add bastion subnet id to the viper config
+	viper.Set("bastion_subnet_id", App.Config.BastionSubnetID)
+
+	// Add hosts to the the config
+	viper.Set("hosts", App.Config.Hosts)
+	// Save the main config
+	if err := viper.SafeWriteConfigAs(configFilePath); err != nil {
+		if os.IsExist(err) {
+			logger.Warn("Config file already exists. Please delete it and retry.", "path", configFilePath)
+		} else {
+			logger.Error("Error writing config file", "error", err)
+			return err
+		}
+	}
+	logger.Debug("Saved config file", "path", configFilePath)
 	return nil
 }

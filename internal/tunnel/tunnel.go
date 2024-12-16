@@ -16,6 +16,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -32,13 +33,13 @@ func GetBastionHostID() (string, error) {
 
 	instances, err := aws.ListInstancesWithTags(tags)
 	if err != nil {
-		logger.Error("Error listing instances with tags", "tags", tags)
+		logger.Debug("Error listing instances with tags", "tags", tags)
 		return "", err
 	}
 
 	if len(instances) == 0 {
 		err = fmt.Errorf("no instances found with required tags and in state RUNNING")
-		logger.Error("Error finding instances", "error", err, "tags", tags)
+		logger.Debug("Error finding instances", "error", err, "tags", tags)
 		return "", err
 	}
 
@@ -211,6 +212,34 @@ func getFreePort() (int, error) {
 		}
 	}(l)
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// CalculateLocalPort converts a remote port to a 5-digit local port.
+// It prefixes "1" or "10" based on the port number.
+// Calculate default Local port from defaultRemotePort. So 3306 would become 13306 and 5006 would become 15006. Take the port number and concat 1 or 10 to it so it becomes 5-digit
+// 3306 -> 13306
+// 5006 -> 15006
+// 22 -> 10022
+// 80 -> 10080
+func CalculateLocalPort(remotePort int) (int, error) {
+	if remotePort <= 0 || remotePort > 65535 {
+		return 0, fmt.Errorf("invalid port number: %d", remotePort)
+	}
+
+	// Convert to string to check the length
+	remotePortStr := strconv.Itoa(remotePort)
+
+	// Add prefixes to make it a 5-digit number
+	if len(remotePortStr) == 4 {
+		// Prefix "1" for 4-digit ports
+		return strconv.Atoi("1" + remotePortStr)
+	} else if len(remotePortStr) <= 3 {
+		// Prefix "100" for 3-digit or smaller ports
+		return strconv.Atoi("100" + remotePortStr)
+	}
+
+	// If already 5 digits or larger (unlikely), return as is
+	return remotePort, nil
 }
 
 // TODO: Fix checkPort logic
