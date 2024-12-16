@@ -27,7 +27,7 @@ var deleteCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
-			deleteBastionInstanceSpinner, _ = pterm.DefaultSpinner.Start("Deleting Ad-Hoc EC2 Bastion Instance...")
+			deleteBastionInstanceSpinner = logger.StartCustomSpinner("Deleting Ad-Hoc EC2 Bastion Instance...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Deleting Ad-Hoc EC2 Bastion Instance...")

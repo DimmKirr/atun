@@ -47,7 +47,9 @@ var upCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
-			upTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+			upTunnelSpinner = logger.StartCustomSpinner(
+				fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID),
+			)
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Starting tunnel via EC2 Bastion Instance...")
@@ -71,8 +73,10 @@ var upCmd = &cobra.Command{
 					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
 				}
 
-				// Use survey to ask if the user wants to create a bastion host
+				// Get default from the flags
 				createHost, _ := cmd.Flags().GetBool("create")
+
+				// If the create flag is not set ask if the user wants to create a bastion host
 				if !createHost {
 					err = survey.AskOne(&survey.Confirm{
 						Message: fmt.Sprintf("Would you like to create an ad-hoc bastion host? (It's easy to cleanly delete)"),
@@ -98,8 +102,11 @@ var upCmd = &cobra.Command{
 				logger.Debug("Created host")
 
 				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				if err != nil {
+					logger.Fatal("Error discovering bastion host", "error", err)
+				}
 				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-				upTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+				upTunnelSpinner = logger.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
 
 				// TODO: suggest creating a bastion host.
 				// Use survey to ask if the user wants to create a bastion host

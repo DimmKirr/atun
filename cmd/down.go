@@ -44,7 +44,7 @@ var downCmd = &cobra.Command{
 		}
 
 		if showSpinner {
-			downTunnelSpinner, _ = pterm.DefaultSpinner.Start("Stopping tunnel...")
+			downTunnelSpinner = logger.StartCustomSpinner("Stopping tunnel...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Stopping tunnel...")
@@ -55,7 +55,7 @@ var downCmd = &cobra.Command{
 			bastionHost = cmd.Flag("bastion").Value.String()
 
 			if showSpinner {
-				downTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Stopping tunnel via bastion host %s...", config.App.Config.BastionHostID))
+				downTunnelSpinner = logger.StartCustomSpinner(fmt.Sprintf("Stopping tunnel via bastion host %s...", config.App.Config.BastionHostID))
 			} else {
 				logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 				logger.Info("Stopping tunnel via EC2 Bastion Instance...")
@@ -83,7 +83,7 @@ var downCmd = &cobra.Command{
 			}
 		}
 		if showSpinner {
-			downTunnelSpinner.Success("Tunnel stopped")
+			downTunnelSpinner.Success("Tunnel is stopped")
 		} else {
 			logger.Debug("Tunnel status", "status", tunnelStarted)
 		}
@@ -93,7 +93,7 @@ var downCmd = &cobra.Command{
 		deleteBastion, _ := cmd.Flags().GetBool("delete")
 
 		if deleteBastion {
-			logger.Info("Delete flag is set. Deleting bastсion host", "bastion", config.App.Config.BastionHostID)
+			logger.Info("Delete flag is set. Deleting bastion host", "bastion", config.App.Config.BastionHostID)
 
 			// Run create command from here
 			err := deleteCmd.RunE(deleteCmd, args)
