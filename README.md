@@ -21,7 +21,7 @@ brew install atun
 
 
 ![demo.gif](demo.gif)
-_(UI is still in progress)_
+_(This is a MOCK Demo. Will update it soon)_
 
 ## Features
 
