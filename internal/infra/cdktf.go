@@ -8,6 +8,7 @@ package infra
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
@@ -123,18 +124,32 @@ func createStack(c *config.Config) {
 		bastionHostAmi = config.App.Config.BastionHostAMI
 	}
 
+	_, isPrivate, err := aws.CheckSubnetNetworkAccess(config.App.Config.BastionSubnetID)
+	if err != nil {
+		logger.Fatal("Error checking subnet network access", "error", err)
+	}
+
+	var publicSubnets []string
+	var privateSubnets []string
+	if isPrivate {
+		privateSubnets = append(privateSubnets, config.App.Config.BastionSubnetID)
+	} else {
+		publicSubnets = append(publicSubnets, config.App.Config.BastionSubnetID)
+	}
+
 	// TODO: Add ability to specify other modules
 	terraformVariablesModules := map[string]interface{}{
 		"env":                 config.App.Config.Env,
 		"name":                config.App.Config.BastionInstanceName,
 		"ec2_key_pair_name":   config.App.Config.AWSKeyPair,
-		"public_subnets":      []string{},
-		"private_subnets":     []string{config.App.Config.BastionSubnetID},
+		"public_subnets":      publicSubnets,
+		"private_subnets":     privateSubnets,
 		"allowed_cidr_blocks": []string{"0.0.0.0/0"},
 		"instance_type":       config.App.Config.AWSInstanceType,
 		"instance_ami":        bastionHostAmi,
-		"vpc_id":              config.App.Config.BastionVPCID,
-		"tags":                tags,
+
+		"vpc_id": config.App.Config.BastionVPCID,
+		"tags":   tags,
 	}
 
 	logger.Debug("Terraform Variables", "variables", terraformVariablesModules)

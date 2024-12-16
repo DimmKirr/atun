@@ -28,7 +28,7 @@ var upCmd = &cobra.Command{
 	If the bastion host is not provided, the first running instance with the atun.io/version tag is used.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: Use GO Method received on `atun`
-		// TODO: Implement VPC, subnet picker (1. get list of VPCs, 2. Get a list of Subnets in it, 3. Ask user if it's not provided)
+
 		var err error
 		var bastionHost string
 		logger.Debug("Up command called", "bastion", bastionHost, "aws profile", config.App.Config.AWSProfile, "env", config.App.Config.Env)
@@ -47,7 +47,7 @@ var upCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
-			upTunnelSpinner, _ = pterm.DefaultSpinner.Start("Starting tunnel via bastion host %s...")
+			upTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Starting tunnel via EC2 Bastion Instance...")
@@ -64,17 +64,24 @@ var upCmd = &cobra.Command{
 		if bastionHost == "" {
 			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
 			if err != nil {
-				logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
+				if showSpinner {
+					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
+					upTunnelSpinner.Stop()
+				} else {
+					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
+				}
 
 				// Use survey to ask if the user wants to create a bastion host
-				createHost := false
-				err = survey.AskOne(&survey.Confirm{
-					Message: fmt.Sprintf("Would you like to create an ad-hoc bastion host? (It's easy to cleanly delete)"),
-					Default: true,
-				}, &createHost)
-				if err != nil {
-					logger.Fatal("Error getting confirmation:", err)
-					return err
+				createHost, _ := cmd.Flags().GetBool("create")
+				if !createHost {
+					err = survey.AskOne(&survey.Confirm{
+						Message: fmt.Sprintf("Would you like to create an ad-hoc bastion host? (It's easy to cleanly delete)"),
+						Default: true,
+					}, &createHost)
+					if err != nil {
+						logger.Fatal("Error getting confirmation:", err)
+						return err
+					}
 				}
 
 				if !createHost {
@@ -92,6 +99,7 @@ var upCmd = &cobra.Command{
 
 				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
 				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
+				upTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
 
 				// TODO: suggest creating a bastion host.
 				// Use survey to ask if the user wants to create a bastion host
@@ -156,6 +164,7 @@ var upCmd = &cobra.Command{
 
 		// Wait until the instance is running
 
+		upTunnelSpinner.Info("Adding local SSH Public key to the instance...")
 		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
 		if err != nil {
 			if showSpinner {
@@ -183,7 +192,11 @@ var upCmd = &cobra.Command{
 		// TODO: Refactor naming of connectionInfo
 		connectionInfo, err := tunnel.StartTunnel(config.App)
 		if err != nil {
-			logger.Fatal("Error running tunnel", "error", err)
+			if showSpinner {
+				upTunnelSpinner.Fail(fmt.Sprintf("Error starting tunnel %s", err))
+			} else {
+				logger.Fatal("Error running tunnel", "error", err)
+			}
 		}
 
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
@@ -247,5 +260,6 @@ var upCmd = &cobra.Command{
 func init() {
 	logger.Debug("Initializing up command")
 	upCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
+	upCmd.PersistentFlags().BoolP("create", "c", false, "Create ad-hoc bastion (if it doesn't exist). Will be managed by built-in CDKTf")
 	logger.Debug("Up command initialized")
 }

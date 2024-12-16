@@ -69,7 +69,7 @@ func RunSSH(app *config.Atun, args []string) error {
 	//}
 	// Run the command
 	if err := c.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "SSH command error: %v\n", err)
+		logger.Debug("SSH command error", "error", err)
 		return fmt.Errorf("failed to run SSH process: %w", err)
 
 		// Print stdot and stderr from the command

@@ -288,8 +288,42 @@ func GetVPCIDFromSubnet(subnetID string) (string, error) {
 	return *result.Subnets[0].VpcId, nil
 }
 
-// GetAvailableSubnets returns a list of available subnets in AWS Account (in all VPCs)
-func GetAvailableSubnets() ([]*ec2.Subnet, error) {
+// CheckSubnetNetworkAccess checks if the subnet has network access by checking routes
+func CheckSubnetNetworkAccess(subnetID string) (bool, bool, error) {
+	ec2Client, err := NewEC2Client(*config.App.Session.Config)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to create EC2 client: %w", err)
+	}
+
+	// Get the route table associated with the subnet
+	routeTablesOutput, err := ec2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("association.subnet-id"),
+				Values: []*string{aws.String(subnetID)},
+			},
+		},
+	})
+	if err != nil {
+		return false, false, fmt.Errorf("error describing route tables: %w", err)
+	}
+
+	// Check if there is a route to an internet gateway or a NAT gateway
+	for _, routeTable := range routeTablesOutput.RouteTables {
+		for _, route := range routeTable.Routes {
+			if route.GatewayId != nil && strings.HasPrefix(*route.GatewayId, "igw-") {
+				return true, false, nil // Route to an internet gateway, public subnet
+			}
+			if route.NatGatewayId != nil {
+				return true, true, nil // Route to a NAT gateway, private subnet
+			}
+		}
+	}
+
+	return false, false, nil
+}
+
+func GetSubnetsWithSSM() ([]*ec2.Subnet, error) {
 	ec2Client, err := NewEC2Client(*config.App.Session.Config)
 	if err != nil {
 		return nil, err
@@ -299,7 +333,16 @@ func GetAvailableSubnets() ([]*ec2.Subnet, error) {
 
 	var subnets []*ec2.Subnet
 	err = ec2Client.DescribeSubnetsPages(input, func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
-		subnets = append(subnets, page.Subnets...)
+		for _, subnet := range page.Subnets {
+			hasAccess, _, err := CheckSubnetNetworkAccess(*subnet.SubnetId)
+			if err != nil {
+				logger.Error("Failed to check network access for subnet", "subnetID", *subnet.SubnetId, "error", err)
+				continue
+			}
+			if hasAccess {
+				subnets = append(subnets, subnet)
+			}
+		}
 		return !lastPage
 	})
 	if err != nil {

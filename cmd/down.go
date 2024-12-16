@@ -6,11 +6,13 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -35,6 +37,16 @@ var downCmd = &cobra.Command{
 
 		bastionHost = cmd.Flag("bastion").Value.String()
 
+		var downTunnelSpinner *pterm.SpinnerPrinter
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+
+		if showSpinner {
+			downTunnelSpinner, _ = pterm.DefaultSpinner.Start(fmt.Sprintf("Stopping tunnel via bastion host %s...", config.App.Config.BastionHostID))
+		} else {
+			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
+			logger.Info("Stopping tunnel via EC2 Bastion Instance...")
+		}
+
 		aws.InitAWSClients(config.App)
 
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
@@ -56,7 +68,26 @@ var downCmd = &cobra.Command{
 			logger.Error("Failed to stop tunnel", "error", err)
 		}
 
-		logger.Debug("Tunnel status", "status", tunnelStatus)
+		if showSpinner {
+			downTunnelSpinner.Success("Tunnel stopped")
+		} else {
+			logger.Debug("Tunnel status", "status", tunnelStatus)
+		}
+
+		// Get delete flag
+
+		deleteBastion, _ := cmd.Flags().GetBool("delete")
+
+		if deleteBastion {
+			logger.Info("Delete flag is set. Deleting bastсion host", "bastion", config.App.Config.BastionHostID)
+
+			// Run create command from here
+			err := deleteCmd.RunE(deleteCmd, args)
+			if err != nil {
+				return fmt.Errorf("error running deleteCmd: %w", err)
+			}
+		}
+
 		return nil
 	},
 }
@@ -64,7 +95,9 @@ var downCmd = &cobra.Command{
 func init() {
 	logger.Debug("Initializing up command")
 	// Here you will define your flags and configuration settings.
+	// Add a boolean "delete" flag to downcmd
 	downCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
+	downCmd.PersistentFlags().BoolP("delete", "d", false, "Delete ad-hoc bastion (if exists). Won't delete any resources non-managed by atun")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// downCmd.PersistentFlags().String("foo", "", "A help for foo")

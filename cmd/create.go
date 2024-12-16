@@ -90,10 +90,10 @@ var createCmd = &cobra.Command{
 		if config.App.Config.BastionVPCID == "" {
 			if config.App.Config.BastionSubnetID == "" {
 				logger.Info("No Subnet ID provided. Asking for it.")
-				// Get list of subnets in the account (via GetAvailableSubnets) and ask the user to pick one with survey
-				subnets, err := aws.GetAvailableSubnets()
+				// Get list of subnets in the account (via GetSubnetsWithSSM) and ask the user to pick one with survey
+				subnets, err := aws.GetSubnetsWithSSM()
 				if err != nil {
-					logger.Fatal("Error getting available subnets", "err", err)
+					logger.Fatal("Error getting subnets with SSM", "err", err)
 				}
 
 				// Ask user to pick a subnet
@@ -106,6 +106,7 @@ var createCmd = &cobra.Command{
 						}
 						return options
 					}(),
+					Help: "If you don't see your subnets it means there is no SSM connectivity there",
 					Description: func(value string, index int) string {
 						var name string
 						for _, tag := range subnets[index].Tags {
@@ -114,7 +115,7 @@ var createCmd = &cobra.Command{
 							}
 
 						}
-						return fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
+						return fmt.Sprintf("SSM: OK, CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
 					},
 				}, &config.App.Config.BastionSubnetID, survey.WithValidator(survey.Required))
 			}
@@ -198,8 +199,8 @@ func buildHostConfig(app *config.Atun) error {
 
 	aws.InitAWSClients(config.App)
 
-	// Get list of subnets in the account (via GetAvailableSubnets) to use as default values
-	subnets, err := aws.GetAvailableSubnets()
+	// Get list of subnets in the account (via GetSubnetsWithSSM) to use as default values
+	subnets, err := aws.GetSubnetsWithSSM()
 	if err != nil {
 		log.Fatalf("Error getting available subnets: %v", err)
 		return err
