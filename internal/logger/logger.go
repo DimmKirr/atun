@@ -130,10 +130,7 @@ func StartCustomSpinner(message string) *pterm.SpinnerPrinter {
 		"  🐟  ",
 		" 🐟   ",
 		"🐟    ",
-		//"🫧   ",
-		//" 🫧  ",
-		//"  🫧 ",
-		//"   🫧",
+		"🫧    ",
 	}
 
 	spinner.Style = pterm.NewStyle(pterm.FgCyan) // Custom color

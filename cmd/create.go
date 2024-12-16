@@ -179,7 +179,6 @@ func buildHostConfig(app *config.Atun) error {
 	logger.Debug("Building host config")
 
 	var err error
-	var confirmation = false
 
 	// Confirm the selection
 	startSurvey := false
@@ -414,34 +413,6 @@ func buildHostConfig(app *config.Atun) error {
 			break
 		}
 	}
-
-	// Confirm the selection
-	confirmation = false
-	err = survey.AskOne(&survey.Confirm{
-		Message: fmt.Sprintf("You entered: %v\nConfirm?", app.Config.Hosts),
-		Default: false,
-	}, &confirmation)
-
-	if err != nil {
-		log.Fatalf("Error getting confirmation: %v", err)
-		return err
-	}
-
-	if confirmation {
-		logger.Info("Configuration confirmed. Proceeding...")
-
-		//	// Continue with the rest of your logic
-	}
-
-	//
-	//if confirmation {
-	//	logger.Info("Configuration confirmed. Proceeding...")
-	//
-	//	// Continue with the rest of your logic
-	//	return nil
-	//} else {
-	//	logger.Info("Configuration not confirmed. Exiting.")
-	//}
 
 	return nil
 }

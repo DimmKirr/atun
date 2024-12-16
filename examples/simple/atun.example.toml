@@ -9,14 +9,14 @@ aws_region="us-east-1"
 [[hosts]]
 name = "ipconfig.io"
 proto = "ssm"
-remote = "80"
-local = "10080"
+remote = 80
+local = 10080
 
 [[hosts]]
 name = "icanhazip.com"
 proto = "ssm"
-remote = "80"
-local = "10081"
+remote = 80
+local = 10081
 
 #[[hosts]]
 #name = "target-vpc-host-3"

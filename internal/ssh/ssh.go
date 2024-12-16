@@ -203,8 +203,17 @@ func GetSSMPluginStatus(app *config.Atun) (bool, error) {
 	return true, nil
 }
 
-func GetTunnelStatus(app *config.Atun) (bool, error) {
+func GetTunnelStatus(app *config.Atun) (bool, [][]string, error) {
+	// TODO: Add port check too to make sure to see outrun tunnels
 	bastionSockFilePath := getBastionSockFilePath(app)
+
+	var connections [][]string
+
+	// Fill in connections with the tunnel connections from Hosts
+	for _, v := range config.App.Config.Hosts {
+		logger.Debug("Host", "name", v.Name, "proto", v.Proto, "remote", v.Remote, "local", v.Local)
+		connections = append(connections, []string{fmt.Sprintf("%s:%d", v.Name, v.Remote), fmt.Sprintf("127.0.0.1:%d", v.Local)})
+	}
 
 	// If a bastion socket file exists, check the tunnel status
 	if _, err := os.Stat(bastionSockFilePath); !os.IsNotExist(err) {
@@ -222,15 +231,15 @@ func GetTunnelStatus(app *config.Atun) (bool, error) {
 		}
 
 		if err := cmd.Run(); err != nil {
-			return false, fmt.Errorf("failed to check tunnel status: %w", err)
+			return false, nil, fmt.Errorf("failed to check tunnel status: %w", err)
 		}
 
-		return true, nil
+		return true, connections, nil
 
 	}
 
 	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", bastionSockFilePath)
-	return false, nil
+	return false, nil, nil
 }
 
 func StopTunnel(app *config.Atun) (bool, error) {

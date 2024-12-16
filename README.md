@@ -19,15 +19,6 @@ brew tap automationd/tap
 brew install atun
 ```
 
-### Install from Homebrew (dev version)
-```bash
-brew tap automationd/tap
-brew install atun --build-from-source
-```
-If the dev version has cached old metadata (b/c version is the same), use this command:
-```shell
-brew update && brew fetch --force atun && brew reinstall atun
-```
 
 ![demo.gif](demo.gif)
 _(UI is still in progress)_
@@ -91,4 +82,13 @@ atun down
 atun status
 ```
 
-##
+## Development & Contributing
+### Install from Homebrew (dev version)
+```bash
+brew tap automationd/tap
+brew install atun --build-from-source
+```
+If the dev version has cached old metadata (b/c version is the same), use this command:
+```shell
+brew update && brew fetch --force atun && brew reinstall atun
+```
