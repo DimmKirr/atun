@@ -98,7 +98,7 @@ var createCmd = &cobra.Command{
 
 				// Ask user to pick a subnet
 				err = survey.AskOne(&survey.Select{
-					Message: "Select Subnet ID:",
+					Message: "Bastion Instance will be deployed.\nSelect Subnet ID:",
 					Options: func() []string {
 						var options []string
 						for _, subnet := range subnets {
@@ -133,7 +133,7 @@ var createCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
-			createBastionInstanceSpinner, _ = pterm.DefaultSpinner.Start("Creating Ad-Hoc EC2 Bastion Instance...")
+			createBastionInstanceSpinner = logger.StartCustomSpinner("Creating Ad-Hoc EC2 Bastion Instance...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Creating Ad-Hoc EC2 Bastion Instance...")

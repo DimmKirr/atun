@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 var defaultLogger *slog.Logger
@@ -115,6 +116,32 @@ func Success(msg string) {
 	}
 
 	pterm.Success.Println(msg)
+}
+
+// StartCustomSpinner creates and starts a fresh custom spinner
+func StartCustomSpinner(message string) *pterm.SpinnerPrinter {
+	// Clone DefaultSpinner as a new variable
+	spinner := pterm.DefaultSpinner // Direct assignment to create a new copy
+
+	// Customize the spinner
+	spinner.Sequence = []string{
+		"    🐟",
+		"   🐟 ",
+		"  🐟  ",
+		" 🐟   ",
+		"🐟    ",
+		//"🫧   ",
+		//" 🫧  ",
+		//"  🫧 ",
+		//"   🫧",
+	}
+
+	spinner.Style = pterm.NewStyle(pterm.FgCyan) // Custom color
+	spinner.Delay = 150 * time.Millisecond       // Frame delay
+
+	// Start the spinner
+	s, _ := spinner.Start(message)
+	return s
 }
 
 func init() {
