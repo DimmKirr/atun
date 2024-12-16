@@ -18,7 +18,7 @@ var deleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Deletes an ad-hoc bastion host",
 	Long:  `Deletes an ad-hoc bastion host created by atun. Performed via CDKTF/Terraform: doesn't affect other resources`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: Add check for --force flag
 
 		// TODO: Add survey to check if the user is sure to destroy the stack
@@ -43,7 +43,7 @@ var deleteCmd = &cobra.Command{
 				logger.Error("Failed to delete Bastion Ad-Hoc Instance")
 			}
 			logger.Error("Error running CDKTF", "error", err)
-			return
+			return err
 		}
 
 		if showSpinner {
@@ -52,6 +52,7 @@ var deleteCmd = &cobra.Command{
 			logger.Info("Bastion Ad-Hoc Instance deleted successfully")
 		}
 		logger.Info("CDKTF stack destroyed successfully")
+		return nil
 	},
 }
 

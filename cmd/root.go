@@ -68,10 +68,10 @@ func init() {
 
 	// TODO: Use Method Receiver (pass atun all the way to the command)
 	rootCmd.AddCommand(
+		deleteCmd,
+		createCmd,
 		upCmd,
 		downCmd,
-		createCmd,
-		deleteCmd,
 		statusCmd,
 		versionCmd,
 	)
