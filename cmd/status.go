@@ -10,6 +10,7 @@ import (
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/logger"
+	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
 
 	"github.com/pterm/pterm"
@@ -37,13 +38,20 @@ var statusCmd = &cobra.Command{
 
 		aws.InitAWSClients(config.App)
 
+		tunnelIsUp, connections, err := ssh.GetTunnelStatus(config.App)
+		logger.RenderAsciiArt()
+		err = tunnel.RenderTunnelStatusTable(tunnelIsUp, connections)
+		if err != nil {
+			logger.Error("Failed to render connections table", "error", err)
+		}
+
 		config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
 		if err != nil {
 			logger.Error("Bastion host not found. You might want to create it.", "error", err)
 		}
 
 		// TODO: Hide this info behind --debug flag or move to a `debug` command
-		pterm.DefaultSection.Println("Status")
+		pterm.DefaultSection.Println("App Debug Info")
 		_ = dt.WithData(pterm.TableData{
 			{"AWS_ACCOUNT", aws.GetAccountId()},
 			{"AWS_PROFILE", config.App.Config.AWSProfile},

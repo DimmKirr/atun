@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Masterminds/semver"
+	"github.com/automationd/atun/internal/logger"
 	"github.com/pterm/pterm"
 	"log"
 	"net/http"
@@ -64,24 +65,37 @@ func CheckLatestRelease() {
 		log.Fatal(err)
 	}
 
-	var versionChangeAction = "upgrading"
-	if Version > gr.Version {
-		versionChangeAction = "downgrading"
+	if Version == "0.0.0" || Version == "development" {
+		err = ShowUpgradeCommand(true)
+		if err != nil {
+			logger.Fatal("Failed to show upgrade command", "error", err)
+		}
+	} else {
+		var versionChangeAction = "upgrading"
+		if Version > gr.Version {
+			versionChangeAction = "downgrading"
+		}
+
+		if Version != gr.Version {
+			pterm.Warning.Printfln("The newest stable version is %s, but your version is %s. Consider %s.", gr.Version, Version, versionChangeAction)
+			ShowUpgradeCommand(false)
+		}
 	}
-	if Version != gr.Version {
-		pterm.Warning.Printfln("The newest stable version is %s, but your version is %s. Consider %s.", gr.Version, Version, versionChangeAction)
-		ShowUpgradeCommand()
-	}
+
 }
 
 type gitResponse struct {
 	Version string `json:"tag_name"`
 }
 
-func ShowUpgradeCommand() error {
+func ShowUpgradeCommand(isDev bool) error {
 	switch goos := runtime.GOOS; goos {
 	case "darwin":
-		pterm.Warning.Println("Use the command to update: `brew upgrade atun`")
+		if isDev {
+			pterm.Debug.Printfln("To install latest:\n`brew update && brew fetch --force atun && brew reinstall --build-from-source atun`")
+		} else {
+			pterm.Info.Println("Use the command to update: `brew upgrade atun`")
+		}
 	//case "linux":
 	//	distroName, err := requirements.ReadOSRelease("/etc/os-release")
 	//	if err != nil {

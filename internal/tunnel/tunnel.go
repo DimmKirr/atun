@@ -13,6 +13,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pterm/pterm"
 	"log"
 	"net"
 	"os"
@@ -144,17 +145,17 @@ func SetAWSCredentials(sess *session.Session) error {
 	return nil
 }
 
-func StartTunnel(app *config.Atun) (string, error) {
+func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 	logger.Debug("Starting tunnel", "bastion", app.Config.BastionHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
 
 	if err := SetAWSCredentials(app.Session); err != nil {
-		return "", fmt.Errorf("can't start tunnel: %w", err)
+		return false, nil, fmt.Errorf("can't start tunnel: %w", err)
 	}
 
 	// Check if tunnel already exists
-	tunnelIsUp, err := ssh.GetTunnelStatus(app)
+	tunnelIsUp, connections, err := ssh.GetTunnelStatus(app)
 	if err != nil {
-		return "", fmt.Errorf("can't check tunnel: %w", err)
+		return false, nil, fmt.Errorf("can't check tunnel: %w", err)
 	}
 
 	// If tunnel is not up
@@ -162,16 +163,12 @@ func StartTunnel(app *config.Atun) (string, error) {
 		// Check if SSMPlugin is running
 		ssmPluginIsRunning, err := ssh.GetSSMPluginStatus(app)
 		if err != nil {
-			return "", fmt.Errorf("can't check SSM plugin: %w", err)
+			return tunnelIsUp, nil, fmt.Errorf("can't check SSM plugin: %w", err)
 		}
 
 		if ssmPluginIsRunning {
-			return "", fmt.Errorf("Tunnel is down but SSM plugin is already running with bastion host %s", app.Config.BastionHostID)
+			return tunnelIsUp, nil, fmt.Errorf("Tunnel is down but SSM plugin is already running with bastion host %s", app.Config.BastionHostID)
 		}
-
-		// If tunnel exists show message it's already up and show path to socket and forwarding config
-
-		// If tunnel doesn't exist, start a new one.
 
 		// Get the SSH command arguments
 		args := ssh.GetSSHCommandArgs(app)
@@ -180,18 +177,44 @@ func StartTunnel(app *config.Atun) (string, error) {
 		// Run the SSH command
 		err = ssh.RunSSH(app, args)
 		if err != nil {
-			return "", err
+			return tunnelIsUp, nil, err
 		}
 	}
 
-	var connectionInfo string
+	return tunnelIsUp, connections, nil
+}
 
-	for _, v := range config.App.Config.Hosts {
-		logger.Debug("Host", "name", v.Name, "proto", v.Proto, "remote", v.Remote, "local", v.Local)
-		connectionInfo += fmt.Sprintf("%s:%d ➡ 127.0.0.1:%d\n", v.Name, v.Remote, v.Local)
+// RenderTunnelStatusTable creates and renders a custom table with a given header and rows.
+// It can be reused throughout the project.
+func RenderTunnelStatusTable(status bool, rows [][]string) error {
+
+	header := []string{"Remote (Cloud)", "Local"}
+	// Print table title (optional)
+
+	pterm.DefaultSection.Println("Tunnel Status")
+	if !status {
+
+		// Use pterm to render big letters "Down"
+		pterm.DefaultBigText.WithLetters(
+			pterm.NewLettersFromStringWithStyle("Down", pterm.NewStyle(pterm.FgRed)),
+		).Render()
+		return nil
 	}
 
-	return connectionInfo, nil
+	pterm.DefaultSection.Println("Tunnel is up")
+	// Create a new table
+	table := pterm.DefaultTable.WithHasHeader(true) // Table with a header row
+
+	// Set table data (header + rows)
+	data := append([][]string{header}, rows...) // Add header to the rows
+
+	// Render the table
+	err := table.WithData(data).Render()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // TODO: Fix auto-assign port logic

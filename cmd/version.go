@@ -6,9 +6,10 @@
 package cmd
 
 import (
-	"github.com/pterm/pterm"
-
+	"github.com/automationd/atun/internal/config"
+	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/version"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +19,14 @@ var versionCmd = &cobra.Command{
 	Short: "Version",
 	Long:  `Print version`,
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.Printfln("Version: %s", version.FullVersionNumber())
+
+		pterm.Printfln("Version: %s\n", version.FullVersionNumber())
 		version.CheckLatestRelease()
+
+		if !config.App.Config.LogPlainText {
+			logger.RenderAsciiArt()
+		}
+
 	},
 }
 

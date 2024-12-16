@@ -68,7 +68,7 @@ var upCmd = &cobra.Command{
 			if err != nil {
 				if showSpinner {
 					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
-					upTunnelSpinner.Stop()
+
 				} else {
 					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
 				}
@@ -171,7 +171,7 @@ var upCmd = &cobra.Command{
 
 		// Wait until the instance is running
 
-		upTunnelSpinner.Info("Adding local SSH Public key to the instance...")
+		upTunnelSpinner.UpdateText("Adding local SSH Public key to the instance...")
 		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
 		if err != nil {
 			if showSpinner {
@@ -194,10 +194,13 @@ var upCmd = &cobra.Command{
 
 		}
 
-		logger.Debug("Public key sent to bastion host", "bastion", config.App.Config.BastionHostID)
+		if showSpinner {
+			upTunnelSpinner.UpdateText(fmt.Sprintf("Public key sent to bastion host %s", config.App.Config.BastionHostID))
+		} else {
+			logger.Debug("Public key sent to bastion host", "bastion", config.App.Config.BastionHostID)
+		}
 
-		// TODO: Refactor naming of connectionInfo
-		connectionInfo, err := tunnel.StartTunnel(config.App)
+		tunnelIsUp, connections, err := tunnel.StartTunnel(config.App)
 		if err != nil {
 			if showSpinner {
 				upTunnelSpinner.Fail(fmt.Sprintf("Error starting tunnel %s", err))
@@ -209,9 +212,17 @@ var upCmd = &cobra.Command{
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
 
 		if showSpinner {
-			upTunnelSpinner.Success(fmt.Sprintf("Tunnel is up! Forwarded ports: %s", connectionInfo))
+			upTunnelSpinner.Success("Tunnel is up!")
+
+			err = tunnel.RenderTunnelStatusTable(tunnelIsUp, connections)
+			if err != nil {
+				logger.Error("Error rendering connections table", "error", err)
+			}
+			// Print pterm table with connection info
+			// Create a new table pterm.DefaultTable.WithHasHeader() with connections
+
 		} else {
-			logger.Info("Tunnel is up! Forwarded ports:", "connectionInfo", connectionInfo)
+			logger.Info("Tunnel is up! Forwarded ports:", "connections", connections)
 		}
 
 		return nil

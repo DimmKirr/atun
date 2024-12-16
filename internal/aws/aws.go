@@ -500,14 +500,22 @@ func WaitForInstanceReady(instanceID string) error {
 		},
 	}
 
-	ssmOutput, err := ssmClient.DescribeInstanceInformation(ssmInput)
-	if err != nil {
-		return fmt.Errorf("error describing instance information: %w", err)
-	}
+	timeout := time.After(5 * time.Minute)
+	tick := time.Tick(10 * time.Second)
 
-	if len(ssmOutput.InstanceInformationList) == 0 || *ssmOutput.InstanceInformationList[0].PingStatus != "Online" {
-		return fmt.Errorf("SSM agent is not active or inaccessible on instance %s. Does the subnet have Internet (via NAT)?", instanceID)
-	}
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for instance %s to be ready", instanceID)
+		case <-tick:
+			ssmOutput, err := ssmClient.DescribeInstanceInformation(ssmInput)
+			if err != nil {
+				return fmt.Errorf("error describing instance information: %w", err)
+			}
 
-	return nil
+			if len(ssmOutput.InstanceInformationList) > 0 && *ssmOutput.InstanceInformationList[0].PingStatus == "Online" {
+				return nil
+			}
+		}
+	}
 }
