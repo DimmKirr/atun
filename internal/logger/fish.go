@@ -15,7 +15,7 @@ import (
 const (
 	width     = 50 // Total width of the terminal
 	height    = 5  // Number of rows for fish animation
-	frameRate = 100 * time.Millisecond
+	frameRate = 110 * time.Millisecond
 )
 
 // Fish struct to hold fish position and row
@@ -46,10 +46,9 @@ func RenderAsciiArt() {
 	// Render the big text "Atun" once
 
 	bigText, _ := pterm.DefaultBigText.WithLetters(
-		putils.LettersFromStringWithStyle("A", pterm.FgBlue.ToStyle()),
-		putils.LettersFromStringWithStyle("Tun", pterm.FgLightCyan.ToStyle()),
-		putils.LettersFromStringWithStyle(".", pterm.FgGray.ToStyle()),
-		putils.LettersFromStringWithStyle("io", pterm.FgGreen.ToStyle()),
+		putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
+		putils.LettersFromStringWithStyle("Atun", pterm.FgLightCyan.ToStyle()),
+		putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
 	).Srender() // Render the big text to the terminal
 	bigTextArea.Update(bigText) // Render big text area once
 	bigTextArea.Update(bigText + "\n")

@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ATUN_LOG_PLAIN_TEXT: true
+
 jobs:
   goreleaser:
     name: Build and Release with GoReleaser
