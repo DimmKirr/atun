@@ -152,6 +152,22 @@ var createCmd = &cobra.Command{
 			logger.Info("CDKTF stack applied successfully")
 		}
 
+		if showSpinner {
+			createBastionInstanceSpinner.UpdateText("Waiting for the instance to be running...")
+		} else {
+			logger.Debug("Waiting for the instance to be running...")
+		}
+		// Wait until the instance is ready to accept SSM connections
+		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
+		if err != nil {
+			if showSpinner {
+				createBastionInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
+			} else {
+				logger.Fatal("Error waiting for instance to be running", "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				os.Exit(1)
+			}
+		}
+
 		return nil
 	},
 }

@@ -28,6 +28,7 @@ type Config struct {
 	SSHKeyPath               string
 	SSHConfigFile            string
 	SSHStrictHostKeyChecking bool
+	SSHSocketFile            string
 	AWSProfile               string
 	AWSRegion                string
 	AWSKeyPair               string

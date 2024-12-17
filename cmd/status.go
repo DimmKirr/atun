@@ -26,7 +26,7 @@ var statusCmd = &cobra.Command{
 	Long: `Show status of the tunnel and current environment.
 	This is also useful for troubleshooting`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: Implement Tunnel Status
+		var bastionHost string
 
 		logger.Debug("Status command called")
 		cwd, err := os.Getwd()
@@ -37,9 +37,50 @@ var statusCmd = &cobra.Command{
 		dt := pterm.DefaultTable
 
 		aws.InitAWSClients(config.App)
+		// Get the bastion host ID from the command line
+		bastionHost = cmd.Flag("bastion").Value.String()
 
-		tunnelIsUp, connections, err := ssh.GetTunnelStatus(config.App)
-		logger.RenderAsciiArt()
+		var upTunnelSpinner *pterm.SpinnerPrinter
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+
+		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
+		if bastionHost == "" {
+			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+			if err != nil {
+				if showSpinner {
+					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
+
+				} else {
+					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
+				}
+
+				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				if err != nil {
+					logger.Fatal("Error discovering bastion host", "error", err)
+				}
+				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
+				upTunnelSpinner = logger.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+
+				// TODO: suggest creating a bastion host.
+				// Use survey to ask if the user wants to create a bastion host
+				// If yes, run the create command
+				// If no, return
+
+			}
+		} else {
+			config.App.Config.BastionHostID = bastionHost
+		}
+
+		bastionHostConfig, err := tunnel.GetBastionHostConfig(config.App.Config.BastionHostID)
+		if err != nil {
+			logger.Fatal("Error getting bastion host config", "err", err)
+		}
+
+		config.App.Version = bastionHostConfig.Version
+		config.App.Config.Hosts = bastionHostConfig.Config.Hosts
+
+		tunnelIsUp, connections, err := ssh.GetSSHTunnelStatus(config.App)
+
 		err = tunnel.RenderTunnelStatusTable(tunnelIsUp, connections)
 		if err != nil {
 			logger.Error("Failed to render connections table", "error", err)
@@ -72,7 +113,7 @@ var statusCmd = &cobra.Command{
 func init() {
 
 	// Here you will define your flags and configuration settings.
-
+	statusCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
