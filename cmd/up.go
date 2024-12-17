@@ -169,19 +169,13 @@ var upCmd = &cobra.Command{
 
 		logger.Debug("Public key", "key", publicKey)
 
-		// Wait until the instance is running
-
-		upTunnelSpinner.UpdateText("Adding local SSH Public key to the instance...")
-		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
-		if err != nil {
-			if showSpinner {
-				upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance")
-			} else {
-				logger.Fatal("Error waiting for instance to be running", "BastionHostID", config.App.Config.BastionHostID, "error", err)
-				os.Exit(1)
-			}
+		if showSpinner {
+			upTunnelSpinner.UpdateText("Adding local SSH Public key to the instance...")
+		} else {
+			logger.Debug("Adding local SSH Public key to the instance")
 		}
 
+		// TODO First try to auth with the current key and only then
 		// Send the public key to the bastion instance
 		err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
 		if err != nil {
@@ -228,52 +222,6 @@ var upCmd = &cobra.Command{
 		return nil
 	},
 }
-
-//func checkTunnel(app *config.Atun) (bool, error) {
-//	bastionSocketPath := path.Join(app.Config.AppDir, "bastion.sock")
-//
-//	// Check if the socket file exists. If it does, check if the tunnel is up
-//	if _, err := os.Stat(bastionSocketPath); !os.IsNotExist(err) {
-//		logger.Info("A socket file from another tunnel has been found", "path", bastionSocketPath)
-//		c := exec.Command(
-//			logger.Debug("Checking tunnel in socket", "socket", bastionSocketPath)
-//			"ssh", "-S", bastionSocketPath, "-O", "check", "",
-//		)
-//
-//		out := &bytes.Buffer{}
-//		c.Stdout = out
-//		c.Stderr = out
-//		c.Dir = dir
-//
-//		err := c.Run()
-//		if err == nil {
-//			sshConfigPath := fmt.Sprintf("%s/ssh.config", dir)
-//			sshConfig, err := getSSHConfig(sshConfigPath)
-//			if err != nil {
-//				return false, fmt.Errorf("can't check tunnel: %w", err)
-//			}
-//
-//			pterm.Success.Println("Tunnel is up. Forwarding config:")
-//			hosts := getHosts(sshConfig)
-//			var forwardConfig string
-//			for _, h := range hosts {
-//				forwardConfig += fmt.Sprintf("%s:%s ➡ localhost:%s\n", h[2], h[3], h[1])
-//			}
-//			pterm.Println(forwardConfig)
-//
-//			return true, nil
-//		} else {
-//			pterm.Warning.Println("Tunnel socket file seems to be not useable. We have deleted it")
-//			err := os.Remove(bastionSocketPath)
-//			if err != nil {
-//				return false, err
-//			}
-//			return false, nil
-//		}
-//	}
-//
-//	return false, nil
-//}
 
 func init() {
 	logger.Debug("Initializing up command")

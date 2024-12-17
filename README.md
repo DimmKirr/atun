@@ -66,20 +66,29 @@ atun create
 ```
 
 ### Bring up a tunnel
-```bash
+This will bring an tunnel via existing atun.io bastion
+```shell
 atun up
 ```
 
 ### Bring down a tunnel
-
 ```bash
 atun down
 ```
 
 ### Check the status of the tunnel
-
 ```bash
 atun status
+```
+
+### Create a bastion host and connect in one go
+```shell
+atun up --create
+```
+
+### Bring down a tunnel and delete ad-hoc bastion host
+```shell
+atun down --delete
 ```
 
 ## Development & Contributing
@@ -92,3 +101,8 @@ If the dev version has cached old metadata (b/c version is the same), use this c
 ```shell
 brew update && brew fetch --force atun && brew reinstall atun
 ```
+
+
+## Roadmap
+- [ ] Kubernetes (via annotations & ssh pod)
+- [ ] AWS EC2 Instance connect

@@ -38,7 +38,7 @@ var downCmd = &cobra.Command{
 		var downTunnelSpinner *pterm.SpinnerPrinter
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
-		tunnelStarted, _, err := ssh.GetTunnelStatus(config.App)
+		tunnelStarted, _, err := ssh.GetSSHTunnelStatus(config.App)
 
 		if err != nil {
 			logger.Error("Failed to get tunnel status", "error", err)
@@ -78,7 +78,7 @@ var downCmd = &cobra.Command{
 
 			logger.Debug("All constraints satisfied")
 
-			tunnelStarted, err = ssh.StopTunnel(config.App)
+			tunnelStarted, err = ssh.StopSSHTunnel(config.App)
 			if err != nil {
 				logger.Error("Failed to stop tunnel", "error", err)
 			}

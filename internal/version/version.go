@@ -11,7 +11,6 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/pterm/pterm"
-	"log"
 	"net/http"
 	"runtime"
 	"runtime/debug"
@@ -56,16 +55,23 @@ func CheckLatestRelease() {
 
 	resp, err := http.Get("https://api.github.com/repos/automationd/atun/releases/latest")
 	if err != nil {
-		log.Fatalln(err)
+		logger.Error("Failed to check for the latest version", "error", err)
 	}
 
 	var gr gitResponse
 
-	if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
-		log.Fatal(err)
+	// Handle the case when Github API won't respond (like rate limiting)
+	if resp.StatusCode != 200 {
+		logger.Debug("Failed to check for the latest version", "error", fmt.Errorf("status code: %d", resp.StatusCode))
+		gr.Version = "unknown"
+	} else {
+		if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
+			logger.Fatal("Failed to check for the latest version", "error", fmt.Errorf("status code: %d"))
+		}
 	}
 
-	if Version == "0.0.0" || Version == "development" {
+	//if Version == "0.0.0" || Version == "development" || Version == "unknown" {
+	if false {
 		err = ShowUpgradeCommand(true)
 		if err != nil {
 			logger.Fatal("Failed to show upgrade command", "error", err)

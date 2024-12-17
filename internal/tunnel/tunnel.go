@@ -24,6 +24,21 @@ import (
 // GetBastionHostID retrieves the Bastion Host ID from AWS tags.
 // It takes a session, tag name, and tag value as parameters and returns the instance ID of the Bastion Host.
 func GetBastionHostID() (string, error) {
+	// First try to find bastion host id from the running process
+	runningTunnels, err := ssh.GetRunningTunnels(config.App)
+	logger.Debug("Running tunnels", "tunnels", runningTunnels)
+
+	if len(runningTunnels) > 0 {
+		// Get the bastion host ID from the running tunnels
+		for _, tunnel := range runningTunnels {
+			// Get the bastion host ID from the running tunnel
+			bastionHostID := tunnel.BastionHostID
+			if bastionHostID != "" {
+				return bastionHostID, nil
+			}
+		}
+	}
+
 	logger.Debug("Getting bastion host ID. Looking for atun routers.")
 
 	// Build a map of tags to filter instances
@@ -153,7 +168,7 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 	}
 
 	// Check if tunnel already exists
-	tunnelIsUp, connections, err := ssh.GetTunnelStatus(app)
+	tunnelIsUp, connections, err := ssh.GetSSHTunnelStatus(app)
 	if err != nil {
 		return false, nil, fmt.Errorf("can't check tunnel: %w", err)
 	}
@@ -170,12 +185,8 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 			return tunnelIsUp, nil, fmt.Errorf("Tunnel is down but SSM plugin is already running with bastion host %s", app.Config.BastionHostID)
 		}
 
-		// Get the SSH command arguments
-		args := ssh.GetSSHCommandArgs(app)
-
-		// TODO: Refactor without RunSSH, but instead have a dedicated fnction
-		// Run the SSH command
-		err = ssh.RunSSH(app, args)
+		// Start SSH Tunnel
+		err = ssh.StartSSHTunnel(app)
 		if err != nil {
 			return tunnelIsUp, nil, err
 		}
@@ -187,21 +198,19 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 // RenderTunnelStatusTable creates and renders a custom table with a given header and rows.
 // It can be reused throughout the project.
 func RenderTunnelStatusTable(status bool, rows [][]string) error {
-
-	header := []string{"Remote (Cloud)", "Local"}
+	header := []string{"Remote (Cloud)", "Local", "Status"}
 	// Print table title (optional)
 
-	pterm.DefaultSection.Println("Tunnel Status")
+	// If status is true set statusIcon to🟢else 🔴
+	statusIcon := "🔴"
+	if status {
+		statusIcon = "🟢"
+	}
+	pterm.DefaultSection.Println("Tunnel " + statusIcon)
 	if !status {
-
-		// Use pterm to render big letters "Down"
-		pterm.DefaultBigText.WithLetters(
-			pterm.NewLettersFromStringWithStyle("Down", pterm.NewStyle(pterm.FgRed)),
-		).Render()
+		pterm.FgGray.Println("Down")
 		return nil
 	}
-
-	pterm.DefaultSection.Println("Tunnel is up")
 	// Create a new table
 	table := pterm.DefaultTable.WithHasHeader(true) // Table with a header row
 
@@ -219,7 +228,8 @@ func RenderTunnelStatusTable(status bool, rows [][]string) error {
 
 // TODO: Fix auto-assign port logic
 func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	// TODO: start from 50000 and find first free port
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
 		return 0, err
 	}
