@@ -6,6 +6,7 @@
 package logger
 
 import (
+	"github.com/eiannone/keyboard"
 	"github.com/pterm/pterm"
 	"math/rand"
 	"time"
@@ -46,7 +47,6 @@ func RenderAsciiArt() {
 	bubbles := []Bubble{
 		{Row: 1, Col: 5},
 		{Row: 3, Col: 45},
-		//{Row: 5, Col: 40},
 	}
 
 	// Start two separate areas
@@ -56,60 +56,73 @@ func RenderAsciiArt() {
 	defer bigTextArea.Stop()
 	defer fishArea.Stop()
 
-	// Render the big text "Atun" once
-	//bigText, _ := pterm.DefaultBigText.WithLetters(
-	//	putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
-	//	putils.LettersFromStringWithStyle("Atun", pterm.FgLightCyan.ToStyle()),
-	//	putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
-	//).Srender()
-	//bigTextArea.Update(bigText + "\n")
-
 	ticker := time.NewTicker(frameRate)
 	bubbleTicker := time.NewTicker(bubbleRate)
 	defer ticker.Stop()
 	defer bubbleTicker.Stop()
 
-	// Infinite Animation Loop for the fish and bubbles
-	for {
-		select {
-		case <-ticker.C:
-			// Generate the fish animation frame
-			fishFrame := generateFrame(fishes, bubbles, width, height)
-			fishArea.Update(fishFrame)
+	stopChan := make(chan struct{})
 
-			// Update positions for all fish
-			for i := range fishes {
-				variation := rand.Intn(4) + 1
+	// Animation loop
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				// Generate the fish animation frame
+				fishFrame := generateFrame(fishes, bubbles, width, height)
+				fishArea.Update(fishFrame)
 
-				if fishes[i].Pos > 0 {
-					fishes[i].Pos -= 1 * variation
-				} else {
-					// Reset position to the far-right side of the screen
-					fishes[i].Pos = width - 1
-				}
-			}
-
-		case <-bubbleTicker.C:
-			// Move bubbles upward and randomly left or right
-			for i := range bubbles {
-				if bubbles[i].Row > 0 {
-					bubbles[i].Row -= 1 // Move upward
-				} else {
-					// Reset bubble to the bottom row
-					bubbles[i].Row = height - 1
+				// Update positions for all fish
+				for i := range fishes {
+					variation := rand.Intn(4) + 1
+					if fishes[i].Pos > 0 {
+						fishes[i].Pos -= 1 * variation
+					} else {
+						fishes[i].Pos = width - 1
+					}
 				}
 
-				// Randomize horizontal movement: -2 to +2 steps
-				randomStep := rand.Intn(5) - 2 // Generates -2, -1, 0, 1, 2
-				newCol := bubbles[i].Col + randomStep
+			case <-bubbleTicker.C:
+				// Move bubbles upward and randomly left or right
+				for i := range bubbles {
+					if bubbles[i].Row > 0 {
+						bubbles[i].Row -= 1
+					} else {
+						bubbles[i].Row = height - 1
+					}
 
-				// Ensure the bubble stays within bounds
-				if newCol >= 3 && newCol < width {
-					bubbles[i].Col = newCol
+					// Randomize horizontal movement
+					randomStep := rand.Intn(5) - 2
+					newCol := bubbles[i].Col + randomStep
+					if newCol >= 3 && newCol < width {
+						bubbles[i].Col = newCol
+					}
 				}
 			}
 		}
-	}
+		close(stopChan)
+	}()
+
+	// Keyboard listener
+	go func() {
+		if err := keyboard.Open(); err != nil {
+			panic(err)
+		}
+		defer keyboard.Close()
+
+		for {
+			char, key, err := keyboard.GetKey()
+			if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
+				stopChan <- struct{}{}
+				break
+			}
+		}
+	}()
+
+	<-stopChan
+
+	// Clear the fish area and reset terminal display
+	fishArea.Update("") // Clears the fish animation area
 }
 
 // generateFrame generates a frame with multiple fishes and bubbles at their positions
