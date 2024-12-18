@@ -23,8 +23,6 @@ import (
 	"syscall"
 )
 
-// c
-
 // TODO: Refactor GetSSHCommandArgs into separate functions
 
 // GetPublicKey gets the public key from the private key
@@ -174,6 +172,7 @@ func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", bastionSockFilePath)
 	return false, nil, nil
 }
+
 func StartSSHTunnel(app *config.Atun) error {
 	bastionSockFilePath := getBastionSockFilePath(app)
 

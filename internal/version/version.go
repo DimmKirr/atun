@@ -70,8 +70,7 @@ func CheckLatestRelease() {
 		}
 	}
 
-	//if Version == "0.0.0" || Version == "development" || Version == "unknown" {
-	if false {
+	if Version == "0.0.0" || Version == "development" || Version == "unknown" {
 		err = ShowUpgradeCommand(true)
 		if err != nil {
 			logger.Fatal("Failed to show upgrade command", "error", err)

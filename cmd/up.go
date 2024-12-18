@@ -55,6 +55,12 @@ var upCmd = &cobra.Command{
 			logger.Info("Starting tunnel via EC2 Bastion Instance...")
 		}
 
+		if showSpinner {
+			upTunnelSpinner.UpdateText("Authenticating with AWS...")
+
+		} else {
+			logger.Debug("Authenticating with AWS")
+		}
 		aws.InitAWSClients(config.App)
 
 		// Get the bastion host ID from the command line

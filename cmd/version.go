@@ -9,6 +9,8 @@ import (
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/version"
+	"github.com/eiannone/keyboard"
+
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +26,30 @@ var versionCmd = &cobra.Command{
 		version.CheckLatestRelease()
 
 		if !config.App.Config.LogPlainText {
-			logger.RenderAsciiArt()
+			if !config.App.Config.LogPlainText {
+				stopChan := make(chan struct{})
+				go func() {
+					logger.RenderAsciiArt()
+					close(stopChan)
+				}()
+
+				go func() {
+					if err := keyboard.Open(); err != nil {
+						panic(err)
+					}
+					defer keyboard.Close()
+
+					for {
+						char, key, err := keyboard.GetKey()
+						if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
+							stopChan <- struct{}{}
+							break
+						}
+					}
+				}()
+
+				<-stopChan
+			}
 		}
 
 	},
