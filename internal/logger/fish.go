@@ -112,7 +112,7 @@ func RenderAsciiArt() {
 
 		for {
 			char, key, err := keyboard.GetKey()
-			if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
+			if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter || key == keyboard.KeyCtrlC) {
 				stopChan <- struct{}{}
 				break
 			}
