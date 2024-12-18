@@ -7,15 +7,15 @@ package logger
 
 import (
 	"github.com/pterm/pterm"
-	"github.com/pterm/pterm/putils"
 	"math/rand"
 	"time"
 )
 
 const (
-	width     = 50 // Total width of the terminal
-	height    = 5  // Number of rows for fish animation
-	frameRate = 110 * time.Millisecond
+	width      = 50 // Total width of the terminal
+	height     = 5  // Number of rows for fish animation
+	frameRate  = 110 * time.Millisecond
+	bubbleRate = 220 * time.Millisecond // Bubbles move upward 2x slower
 )
 
 // Fish struct to hold fish position and row
@@ -23,6 +23,12 @@ type Fish struct {
 	Pos      int // Horizontal position
 	Row      int // Vertical position (y)
 	StartPos int // Initial starting position
+}
+
+// Bubble struct to hold bubble position and column
+type Bubble struct {
+	Row int // Vertical position (y)
+	Col int // Horizontal position
 }
 
 // RenderAsciiArt animates big text (50x10) and fishes moving right-to-left below it
@@ -36,6 +42,13 @@ func RenderAsciiArt() {
 		{Pos: 50, Row: 4, StartPos: 50},
 	}
 
+	// Define initial positions of bubbles with varying start coordinates
+	bubbles := []Bubble{
+		{Row: 15, Col: 10},
+		{Row: 0, Col: 25},
+		{Row: 25, Col: 40},
+	}
+
 	// Start two separate areas
 	bigTextArea, _ := pterm.DefaultArea.WithCenter(false).Start()
 	fishArea, _ := pterm.DefaultArea.WithCenter(false).Start()
@@ -44,43 +57,56 @@ func RenderAsciiArt() {
 	defer fishArea.Stop()
 
 	// Render the big text "Atun" once
+	//bigText, _ := pterm.DefaultBigText.WithLetters(
+	//	putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
+	//	putils.LettersFromStringWithStyle("Atun", pterm.FgLightCyan.ToStyle()),
+	//	putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
+	//).Srender()
+	//bigTextArea.Update(bigText + "\n")
 
-	bigText, _ := pterm.DefaultBigText.WithLetters(
-		putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
-		putils.LettersFromStringWithStyle("Atun", pterm.FgLightCyan.ToStyle()),
-		putils.LettersFromStringWithStyle("-", pterm.FgGray.ToStyle()),
-	).Srender() // Render the big text to the terminal
-	bigTextArea.Update(bigText) // Render big text area once
-	bigTextArea.Update(bigText + "\n")
+	ticker := time.NewTicker(frameRate)
+	bubbleTicker := time.NewTicker(bubbleRate)
+	defer ticker.Stop()
+	defer bubbleTicker.Stop()
 
-	//oceanBed := generateBed()
-
-	// Infinite Animation Loop for the fish
+	// Infinite Animation Loop for the fish and bubbles
 	for {
-		// Generate the fish animation frame
-		fishFrame := generateFrame(fishes, width, height)
-		//fishFrame += oceanBed
+		select {
+		case <-ticker.C:
+			// Generate the fish animation frame
+			fishFrame := generateFrame(fishes, bubbles, width, height)
+			fishArea.Update(fishFrame)
 
-		// Combine areas: BigText is rendered above the fish animation
-		fishArea.Update(fishFrame)
-		time.Sleep(frameRate)
+			// Update positions for all fish
+			for i := range fishes {
+				variation := rand.Intn(4) + 1
 
-		// Update positions for all fish
-		for i := range fishes {
-			variation := rand.Intn(4) + 1
+				if fishes[i].Pos > 0 {
+					fishes[i].Pos -= 1 * variation
+				} else {
+					// Reset position to the far-right side of the screen
+					fishes[i].Pos = width - 1
+				}
+			}
 
-			if fishes[i].Pos > 0 {
-				fishes[i].Pos = fishes[i].Pos - 1*variation
-			} else {
-				// Reset position to the far-right side of the screen
-				fishes[i].Pos = width - 1
+		case <-bubbleTicker.C:
+			// Move bubbles upward 2x slower
+			for i := range bubbles {
+				variation := rand.Intn(4) + 1
+				if bubbles[i].Row > 0 {
+					bubbles[i].Row -= 1 * variation
+				} else {
+					// Reset bubble to a new randomized bottom position
+					bubbles[i].Row = height - 1
+					bubbles[i].Col = rand.Intn(width-3) + 3 // Randomize column position
+				}
 			}
 		}
 	}
 }
 
-// generateFrame generates a frame with multiple fishes at their positions
-func generateFrame(fishes []Fish, width int, height int) string {
+// generateFrame generates a frame with multiple fishes and bubbles at their positions
+func generateFrame(fishes []Fish, bubbles []Bubble, width int, height int) string {
 	var output string
 
 	// Define the number of bars for each row
@@ -90,7 +116,7 @@ func generateFrame(fishes []Fish, width int, height int) string {
 		line := ""
 
 		// Add bars based on the bar pattern
-		for i := 0; i < barPattern[y%len(barPattern)]; i++ { // Repeats pattern if needed
+		for i := 0; i < barPattern[y%len(barPattern)]; i++ {
 			line += "█"
 		}
 
@@ -99,51 +125,32 @@ func generateFrame(fishes []Fish, width int, height int) string {
 			line += " "
 		}
 
-		// Generate fish animation to the right of the bars
-		for x := 3; x < width; x++ { // Start from 3 since left space is filled
+		// Generate animation to the right of the bars
+		for x := 3; x < width; x++ {
 			char := " "
+
+			// Check for fish presence
 			for _, fish := range fishes {
 				if y == fish.Row && x == fish.Pos {
 					char = "🐟"
 					break
 				}
 			}
+
+			// Check for bubble presence (only render bubble if no fish)
+			if char == " " {
+				for _, bubble := range bubbles {
+					if y == bubble.Row && x == bubble.Col {
+						char = "🫧"
+						break
+					}
+				}
+			}
+
 			line += char
 		}
-
 		output += line + "\n"
 	}
 
 	return output
-}
-
-// generateBed takes ocean bed emojis and randomly generates a string consisting of them based on the width specified by the user
-func generateBed() string {
-	var oceanBed string
-	// Set list of emojis for the ocean bed to randomly select from
-	oceanBedEmojis := []string{
-		"🪸",
-		"🪸",
-		"🪨",
-		"🪨",
-		"🪨",
-		"🐚",
-		"🦑",
-		"🌿",
-		"🌿",
-		"🌿",
-		"🌾",
-	}
-
-	// Generate a random number between min and max length of ocianBedEmojis
-	rand.Seed(time.Now().UnixNano())
-
-	// use width constant and build a loop to create a final string
-	for i := 0; i < width/2; i++ {
-		randomEmoji := rand.Intn(len(oceanBedEmojis))
-		// Print random emoji by
-		oceanBed += oceanBedEmojis[randomEmoji]
-	}
-
-	return oceanBed
 }
