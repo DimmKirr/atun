@@ -12,6 +12,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
+	"github.com/spf13/viper"
 
 	"github.com/pterm/pterm"
 	"os"
@@ -91,6 +92,17 @@ var statusCmd = &cobra.Command{
 			logger.Error("Bastion host not found. You might want to create it.", "error", err)
 		}
 
+		detailedStatus, err := cmd.Flags().GetBool("detailed")
+		if err != nil {
+			return fmt.Errorf("can't get detailed flag: %w", err)
+		}
+
+		if !detailedStatus {
+			os.Exit(0)
+		}
+
+		logger.Debug("Getting detailed status")
+
 		// TODO: Hide this info behind --debug flag or move to a `debug` command
 		pterm.DefaultSection.Println("App Debug Info")
 		_ = dt.WithData(pterm.TableData{
@@ -111,12 +123,15 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
+	// Show detailed status if log level is debug or info, otherwise hide
+	defaultDetailedStatus := false
+	if viper.GetString("LOG_LEVEL") == "debug" || viper.GetString("LOG_LEVEL") == "debug" {
+		defaultDetailedStatus = true
+	}
 
-	// Here you will define your flags and configuration settings.
+	// Here you will define your flags and configuration settings.d
+	statusCmd.Flags().BoolP("detailed", "d", defaultDetailedStatus, "Show detailed status")
 	statusCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

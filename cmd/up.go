@@ -66,8 +66,6 @@ var upCmd = &cobra.Command{
 		// Get the bastion host ID from the command line
 		bastionHost = cmd.Flag("bastion").Value.String()
 
-		// TODO: Add logic if host not found offer create it, add --auto-create-bastion
-
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
 		if bastionHost == "" {
 			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
