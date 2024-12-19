@@ -147,25 +147,38 @@ var createCmd = &cobra.Command{
 		}
 
 		if showSpinner {
-			createBastionInstanceSpinner.Success()
+			createBastionInstanceSpinner.UpdateText("CDKTF stack applied successfully")
 		} else {
 			logger.Info("CDKTF stack applied successfully")
 		}
 
-		if showSpinner {
-			createBastionInstanceSpinner.UpdateText("Waiting for the instance to be running...")
-		} else {
-			logger.Debug("Waiting for the instance to be running...")
+		// Get BastionHostID
+		config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+		if err != nil {
+			logger.Fatal("Error discovering bastion host", "error", err)
 		}
+
+		if showSpinner {
+			createBastionInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.BastionHostID))
+		} else {
+			logger.Debug("Waiting for the instance to be running...", "bastionHostID", config.App.Config.BastionHostID)
+		}
+
 		// Wait until the instance is ready to accept SSM connections
 		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
 		if err != nil {
 			if showSpinner {
 				createBastionInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
 			} else {
-				logger.Fatal("Error waiting for instance to be running", "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				logger.Fatal("Error waiting for instance to be ready", "BastionHostID", config.App.Config.BastionHostID, "error", err)
 				os.Exit(1)
 			}
+		}
+
+		if showSpinner {
+			createBastionInstanceSpinner.Success(fmt.Sprintf("Bastion Host %s is ready. Run `atun up`.", config.App.Config.BastionHostID))
+		} else {
+			logger.Debug("Instance is ready", "bastionHostID", config.App.Config.BastionHostID)
 		}
 
 		return nil

@@ -481,7 +481,7 @@ func WaitForInstanceReady(instanceID string) error {
 		// wait 1 second to simulate the instance to be ready
 
 		logger.Debug("Just Waiting 5 seconds for the instance to be ready")
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 		return nil
 	}
 
