@@ -191,7 +191,8 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 			return tunnelIsUp, nil, err
 		}
 	}
-
+	// Check for status and collect connections again
+	tunnelIsUp, connections, err = ssh.GetSSHTunnelStatus(app)
 	return tunnelIsUp, connections, nil
 }
 
