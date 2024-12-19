@@ -52,7 +52,6 @@ brews:
     license: "Apache 2.0"
     conflicts:
       - atun-dev
-      - atun-dev@{{ .Version }}
 
     test: |
       system "#{bin}/atun --version"
