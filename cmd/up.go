@@ -121,7 +121,6 @@ var upCmd = &cobra.Command{
 		} else {
 			config.App.Config.BastionHostID = bastionHost
 		}
-
 		logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
 
 		// TODO: refactor as a better functional
@@ -134,6 +133,7 @@ var upCmd = &cobra.Command{
 
 		config.App.Version = bastionHostConfig.Version
 		config.App.Config.Hosts = bastionHostConfig.Config.Hosts
+		config.App.Config.BastionHostUser = bastionHostConfig.Config.BastionHostUser
 
 		//config.App.Config = atun.Config
 		//config.App.Hosts = atun.Hosts

@@ -528,3 +528,79 @@ func WaitForInstanceReady(instanceID string) error {
 		}
 	}
 }
+
+// GetInstanceUsername retrieves the default SSH username for an EC2 instance.
+func GetInstanceUsername(instanceID string) (string, error) {
+	ec2Client, err := NewEC2Client(*config.App.Session.Config)
+	if err != nil {
+		logger.Error("Failed to create EC2 client", "error", err)
+		return "", err
+	}
+
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{aws.String(instanceID)},
+	}
+
+	result, err := ec2Client.DescribeInstances(input)
+	if err != nil {
+		logger.Error("Failed to describe instance", "error", err)
+		return "", err
+	}
+
+	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
+		return "", fmt.Errorf("no instance found for ID %s", instanceID)
+	}
+
+	instance := result.Reservations[0].Instances[0]
+
+	// Get AMI ID
+	if instance.ImageId == nil {
+		return "", fmt.Errorf("instance %s has no AMI ID", instanceID)
+	}
+	amiID := *instance.ImageId
+
+	// Get AMI details
+	amiInput := &ec2.DescribeImagesInput{
+		ImageIds: []*string{aws.String(amiID)},
+	}
+
+	amiResult, err := ec2Client.DescribeImages(amiInput)
+	if err != nil || len(amiResult.Images) == 0 {
+		return "", fmt.Errorf("failed to retrieve AMI details for %s", amiID)
+	}
+
+	amiName := *amiResult.Images[0].Name
+
+	// Determine default username based on AMI name
+	username := detectUsernameFromAMI(amiName)
+	if username == "" {
+		return "", fmt.Errorf("could not determine default username for AMI %s", amiName)
+	}
+
+	return username, nil
+}
+
+// detectUsernameFromAMI infers the default SSH username based on AMI name.
+func detectUsernameFromAMI(amiName string) string {
+	switch {
+	case contains(amiName, "ubuntu"):
+		return "ubuntu"
+	case contains(amiName, "amzn") || contains(amiName, "amazon"):
+		return "ec2-user"
+	case contains(amiName, "rhel") || contains(amiName, "centos"):
+		return "ec2-user"
+	case contains(amiName, "debian"):
+		return "admin" // Sometimes "debian"
+	case contains(amiName, "suse") || contains(amiName, "opensuse"):
+		return "ec2-user"
+	case contains(amiName, "fedora"):
+		return "fedora"
+	default:
+		return ""
+	}
+}
+
+// contains checks if a string contains a substring (case-insensitive).
+func contains(str, substr string) bool {
+	return strings.Contains(strings.ToLower(str), strings.ToLower(substr))
+}

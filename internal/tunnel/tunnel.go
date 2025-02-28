@@ -93,6 +93,14 @@ func GetBastionHostConfig(bastionHostID string) (config.Atun, error) {
 		Config: &config.Config{}, // Ensure nested structs are initialized
 	}
 
+	sshUser, err := aws.GetInstanceUsername(bastionHostID)
+	if err != nil {
+		logger.Error("Error getting instance username", "instance_id", bastionHostID, "error", err)
+		return config.Atun{}, err
+	}
+
+	atun.Config.BastionHostUser = sshUser
+
 	for k, v := range tags {
 		// Iterate over the tags and use only atun.io tags
 		if strings.HasPrefix(k, "atun.io") {

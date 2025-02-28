@@ -150,7 +150,6 @@ func LoadConfig() error {
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", true)
 	viper.SetDefault("AWS_INSTANCE_TYPE", "t3.nano")
 	viper.SetDefault("BASTION_INSTANCE_NAME", "atun-bastion")
-	viper.SetDefault("BASTION_HOST_USER", "ec2-user")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
 	viper.SetDefault("LOG_PLAIN_TEXT", false)

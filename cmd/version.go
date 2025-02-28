@@ -21,13 +21,18 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		pterm.Printfln("Version: %s\n", version.FullVersionNumber())
-		version.CheckLatestRelease()
+		//version.CheckLatestRelease()
+
+		// Detect if current terminal is capable of displaying ASCII art
+		// If not, disable it
 
 		if !config.App.Config.LogPlainText {
 			if !config.App.Config.LogPlainText {
 				//stopChan := make(chan struct{})
 				//go func() {
+
 				logger.RenderAsciiArt()
+
 				//close(stopChan)
 				//}()
 
@@ -49,7 +54,6 @@ var versionCmd = &cobra.Command{
 				//<-stopChan
 			}
 		}
-
 	},
 }
 
