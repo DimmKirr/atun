@@ -6,7 +6,6 @@
 package logger
 
 import (
-	"github.com/eiannone/keyboard"
 	"github.com/pterm/pterm"
 	"math/rand"
 	"time"
@@ -104,20 +103,20 @@ func RenderAsciiArt() {
 	}()
 
 	// Keyboard listener
-	go func() {
-		if err := keyboard.Open(); err != nil {
-			panic(err)
-		}
-		defer keyboard.Close()
-
-		for {
-			char, key, err := keyboard.GetKey()
-			if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter || key == keyboard.KeyCtrlC) {
-				stopChan <- struct{}{}
-				break
-			}
-		}
-	}()
+	//go func() {
+	//	if err := keyboard.Open(); err != nil {
+	//		panic(err)
+	//	}
+	//	defer keyboard.Close()
+	//
+	//	for {
+	//		char, key, err := keyboard.GetKey()
+	//		if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter || key == keyboard.KeyCtrlC) {
+	//			stopChan <- struct{}{}
+	//			break
+	//		}
+	//	}
+	//}()
 
 	<-stopChan
 
@@ -131,7 +130,6 @@ func generateFrame(fishes []Fish, bubbles []Bubble, width int, height int) strin
 
 	// Define the number of bars for each row
 	//barPattern := []int{1, 1, 1, 1, 1}
-
 	for y := 0; y < height; y++ {
 		line := ""
 
@@ -171,6 +169,7 @@ func generateFrame(fishes []Fish, bubbles []Bubble, width int, height int) strin
 		}
 		output += line + "\n"
 	}
+	output += ".................. ctrl+c to exit .................."
 	output += "\n"
 
 	return output

@@ -143,6 +143,9 @@ func StartCustomSpinner(message string) *pterm.SpinnerPrinter {
 
 func init() {
 	// Initialize the logger with the default log level
+	if os.Getenv("TERM") != "xterm-256color" {
+		Initialize(viper.GetString("LOG_LEVEL"), true)
+	}
 	Initialize(viper.GetString("LOG_LEVEL"), false)
 
 }

@@ -7,14 +7,15 @@ package config
 
 import (
 	"errors"
-	"github.com/automationd/atun/internal/logger"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/pterm/pterm"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/automationd/atun/internal/logger"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pterm/pterm"
+	"github.com/spf13/viper"
 )
 
 type Atun struct {
@@ -47,6 +48,7 @@ type Config struct {
 	LogPlainText             bool
 	Env                      string
 	AutoAllocatePort         bool
+	TerraformVersion         string
 }
 
 // TODO: Add ability to add multiple ports for forwarding for one host
@@ -150,10 +152,10 @@ func LoadConfig() error {
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", true)
 	viper.SetDefault("AWS_INSTANCE_TYPE", "t3.nano")
 	viper.SetDefault("BASTION_INSTANCE_NAME", "atun-bastion")
-	viper.SetDefault("BASTION_HOST_USER", "ec2-user")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
 	viper.SetDefault("LOG_PLAIN_TEXT", false)
+	viper.SetDefault("TERRAFORM_VERSION", "latest") // Default to latest Terraform version
 
 	// TODO?: Move init a separate file with correct imports of config
 	App = &Atun{
@@ -179,6 +181,7 @@ func LoadConfig() error {
 			LogLevel:                 viper.GetString("LOG_LEVEL"),
 			LogPlainText:             viper.GetBool("LOG_PLAIN_TEXT"),
 			AutoAllocatePort:         viper.GetBool("AUTO_ALLOCATE_PORT"),
+			TerraformVersion:         viper.GetString("TERRAFORM_VERSION"),
 		},
 		Session: nil,
 	}

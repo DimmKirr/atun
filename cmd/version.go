@@ -11,6 +11,8 @@ import (
 	"github.com/automationd/atun/internal/version"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
+	"os"
 )
 
 // versionCmd represents the version command
@@ -21,36 +23,44 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		pterm.Printfln("Version: %s\n", version.FullVersionNumber())
-		version.CheckLatestRelease()
+		//version.CheckLatestRelease()
 
-		if !config.App.Config.LogPlainText {
-			if !config.App.Config.LogPlainText {
-				//stopChan := make(chan struct{})
-				//go func() {
-				logger.RenderAsciiArt()
-				//close(stopChan)
-				//}()
+		// Detect if current terminal is capable of displaying ASCII art
+		// If not, disable it
 
-				//go func() {
-				//	if err := keyboard.Open(); err != nil {
-				//		panic(err)
-				//	}
-				//	defer keyboard.Close()
-				//
-				//	for {
-				//		char, key, err := keyboard.GetKey()
-				//		if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
-				//			stopChan <- struct{}{}
-				//			break
-				//		}
-				//	}
-				//}()
-				//
-				//<-stopChan
-			}
+		if !config.App.Config.LogPlainText && isInteractiveTerminal() {
+			//stopChan := make(chan struct{})
+			//go func() {
+
+			logger.RenderAsciiArt()
+
+			//close(stopChan)
+			//}()
+
+			//go func() {
+			//	if err := keyboard.Open(); err != nil {
+			//		panic(err)
+			//	}
+			//	defer keyboard.Close()
+			//
+			//	for {
+			//		char, key, err := keyboard.GetKey()
+			//		if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
+			//			stopChan <- struct{}{}
+			//			break
+			//		}
+			//	}
+			//}()
+			//
+			//<-stopChan
 		}
 
 	},
+}
+
+// isInteractiveTerminal checks if the current terminal is interactive
+func isInteractiveTerminal() bool {
+	return terminal.IsTerminal(int(os.Stdin.Fd()))
 }
 
 func init() {
