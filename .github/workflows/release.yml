@@ -35,14 +35,6 @@ jobs:
       - name: Install GitHub CLI
         run: sudo apt-get install -y gh
 
-      - name: Dry Run Release
-        run: |
-          echo "This is a dry run release. Will be activated after dev builds are stable"
-          echo GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}            
-          echo RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-          echo GIT_SHA: ${{ env.SHORT_SHA }}
-          echo GITHUB_ACTOR: ${{ github.actor }}
-
       - name: Build with GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -56,7 +48,6 @@ jobs:
           FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
           GIT_SHA: ${{ env.SHORT_SHA }}
           GITHUB_ACTOR: ${{ github.actor }}
-
 
       - name: Publish release
         env:
