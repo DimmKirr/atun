@@ -39,7 +39,7 @@ brews:
   - name: atun
     repository:
       owner: AutomationD
-      name: homebrew-atun
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula
@@ -54,7 +54,7 @@ brews:
       - atun-dev
 
     test: |
-      system "#{bin}/atun --version"
+      system "#{bin}/atun version"
     install: |
       bin.install "atun"
 
@@ -62,7 +62,7 @@ brews:
   - name: atun@{{ .Version }}
     repository:
       owner: AutomationD
-      name: homebrew-atun
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula
@@ -77,6 +77,6 @@ brews:
       - atun-dev
       - atun-dev@{{ .Version }}
     test: |
-      system "#{bin}/atun --version"
+      system "#{bin}/atun version"
     install: |
       bin.install "atun"
