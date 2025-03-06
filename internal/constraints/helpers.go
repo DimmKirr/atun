@@ -220,5 +220,7 @@ func GetOSRelease(configfile string) (map[string]string, error) {
 
 // IsInteractiveTerminal checks if the current terminal is interactive
 func IsInteractiveTerminal() bool {
-	return terminal.IsTerminal(int(os.Stdin.Fd()))
+	terminalInteractive := terminal.IsTerminal(int(os.Stdin.Fd()))
+	logger.Debug("Terminal", "interactive", terminalInteractive)
+	return terminalInteractive
 }

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,14 +41,26 @@ const (
 	localstackReadyLog = "Ready."
 )
 
-// TestAtunCreateDelete performs the full lifecycle test
-func TestAtunCreateDelete(t *testing.T) {
+// testSetup contains the common setup for all tests
+type testSetup struct {
+	ctx             context.Context
+	localstack      testcontainers.Container
+	endpoint        string
+	ec2Client       *ec2.EC2
+	vpcID           string
+	subnetID        string
+	workDir         string
+	configPath      string
+	credentialsPath string
+}
+
+// setupTestEnvironment initializes the test environment
+func setupTestEnvironment(t *testing.T) *testSetup {
 	ctx := context.Background()
 
 	// Start LocalStack Container
 	localstackAuthToken := getLocalStackAuthToken(t)
 	localstackContainer := startLocalStack(ctx, t, localstackAuthToken)
-	defer terminateContainer(ctx, localstackContainer)
 
 	// Retrieve LocalStack Endpoint
 	endpoint := getContainerEndpoint(ctx, t, localstackContainer)
@@ -60,7 +73,7 @@ func TestAtunCreateDelete(t *testing.T) {
 	ec2Client := createAWSClient(t, endpoint, credentialsPath)
 	t.Logf("AWS EC2 client created successfully")
 
-	// Step 4: Create VPC and Subnet
+	// Create VPC and Subnet
 	vpcID := createVPC(t, ec2Client, mockVpcCidr, mockVpcTag)
 	subnetID := createSubnet(t, ec2Client, vpcID, mockSubnetTag)
 	t.Logf("VPC and Subnet created successfully %s, %s", vpcID, subnetID)
@@ -69,20 +82,118 @@ func TestAtunCreateDelete(t *testing.T) {
 	amiID := getLatestAMI(t, "al2023-ami-2023")
 	workDir := prepareWorkDir(t, subnetID, amiID)
 
-	// Run `atun create`
-	runAtunCommand(t, workDir, "create")
+	return &testSetup{
+		ctx:             ctx,
+		localstack:      localstackContainer,
+		endpoint:        endpoint,
+		ec2Client:       ec2Client,
+		vpcID:           vpcID,
+		subnetID:        subnetID,
+		workDir:         workDir,
+		configPath:      configPath,
+		credentialsPath: credentialsPath,
+	}
+}
 
-	// Verify EC2 Instance Exists
-	instanceID := verifyEC2Instance(t, ec2Client, "atun.io/version", "1")
-	t.Logf("EC2 instance created successfully with ID: %s", instanceID)
-	//
-	// Run `atun delete`
-	runAtunCommand(t, workDir, "delete")
+// cleanupTestEnvironment cleans up the test environment
+func (s *testSetup) cleanupTestEnvironment(t *testing.T) {
+	terminateContainer(s.ctx, s.localstack)
+}
 
-	// Verify EC2 Instance Removed
-	verifyInstanceDeleted(t, ec2Client, instanceID)
+// runAtunCommand is a helper function to run Atun commands with consistent environment setup
+func runAtunCommand(t *testing.T, workDir, command string, interactive bool, envVars map[string]string) {
+	cmd := exec.Command("atun", command)
+	cmd.Dir = workDir
 
-	t.Log("Test completed successfully")
+	// Set up environment variables
+	for key, value := range envVars {
+		if value == "" {
+			os.Unsetenv(key)
+		} else {
+			os.Setenv(key, value)
+		}
+	}
+
+	// Set up command environment
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("AWS_PROFILE=%s", os.Getenv("AWS_PROFILE")),
+		fmt.Sprintf("AWS_CONFIG_FILE=%s", os.Getenv("AWS_CONFIG_FILE")),
+		fmt.Sprintf("AWS_SHARED_CREDENTIALS_FILE=%s", os.Getenv("AWS_SHARED_CREDENTIALS_FILE")),
+		fmt.Sprintf("AWS_REGION=%s", os.Getenv("AWS_REGION")),
+		fmt.Sprintf("AWS_ENDPOINT_URL=%s", os.Getenv("AWS_ENDPOINT_URL")),
+		"ATUN_LOG_LEVEL=debug",
+	)
+
+	// Set up non-interactive stdin if needed
+	if !interactive {
+		cmd.Stdin = strings.NewReader("")
+	}
+
+	t.Logf("Running `atun %s` in %s with interactive=%v", command, workDir, interactive)
+
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("`atun %s` failed: %v\nOutput: %s", command, err, string(output))
+	} else {
+		t.Logf("`atun %s` ran: \nOutput: %s", command, string(output))
+	}
+}
+
+// TestAtunCreateDelete tests the create/delete flow in both interactive and non-interactive modes
+func TestAtunCreateDelete(t *testing.T) {
+	tests := []struct {
+		name           string
+		interactive    bool
+		expectedOutput string
+		envVars        map[string]string
+	}{
+		{
+			name:           "Interactive terminal",
+			interactive:    true,
+			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			envVars: map[string]string{
+				"TERM":                "xterm-256color",
+				"NO_COLOR":            "",
+				"CLICOLOR":            "1",
+				"CLICOLOR_FORCE":      "1",
+				"ATUN_LOG_PLAIN_TEXT": "false",
+			},
+		},
+		{
+			name:           "Non-interactive terminal",
+			interactive:    false,
+			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			envVars: map[string]string{
+				"TERM":           "",
+				"NO_COLOR":       "1",
+				"CLICOLOR":       "0",
+				"CLICOLOR_FORCE": "0",
+				"CI":             "true",
+				"GITHUB_ACTIONS": "true",
+			},
+		},
+	}
+
+	setup := setupTestEnvironment(t)
+	defer setup.cleanupTestEnvironment(t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Run create command
+			runAtunCommand(t, setup.workDir, "create", tt.interactive, tt.envVars)
+
+			// Verify EC2 Instance Exists
+			instanceID := verifyEC2Instance(t, setup.ec2Client, "atun.io/version", "1")
+			t.Logf("EC2 instance created successfully with ID: %s", instanceID)
+
+			// Run delete command
+			runAtunCommand(t, setup.workDir, "delete", tt.interactive, tt.envVars)
+
+			// Verify EC2 Instance Removed
+			verifyInstanceDeleted(t, setup.ec2Client, instanceID)
+
+			t.Logf("%s test completed successfully", tt.name)
+		})
+	}
 }
 
 // ---------------- Utility Functions ----------------
@@ -254,30 +365,6 @@ local = "10081"
 	filePath := filepath.Join(tmpDir, testAtunConfigFile)
 	_ = os.WriteFile(filePath, []byte(content), 0644)
 	return tmpDir
-}
-
-// runAtunCommand runs the Atun CLI
-func runAtunCommand(t *testing.T, workDir, command string) {
-
-	cmd := exec.Command("atun", command)
-	cmd.Dir = workDir
-	t.Logf("Running `atun %s` in %s", command, workDir)
-
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("AWS_PROFILE=%s", os.Getenv("AWS_PROFILE")),
-		fmt.Sprintf("AWS_CONFIG_FILE=%s", os.Getenv("AWS_CONFIG_FILE")),
-		fmt.Sprintf("AWS_SHARED_CREDENTIALS_FILE=%s", os.Getenv("AWS_SHARED_CREDENTIALS_FILE")),
-		fmt.Sprintf("AWS_REGION=%s", os.Getenv("AWS_REGION")),
-		fmt.Sprintf("AWS_ENDPOINT_URL=%s", os.Getenv("AWS_ENDPOINT_URL")),
-		"ATUN_LOG_LEVEL=debug",
-	)
-
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("`atun %s` failed: %v\nOutput: %s", command, err, string(output))
-	} else {
-		t.Logf("`atun %s` ran: \nOutput: %s", command, string(output))
-	}
-
 }
 
 // verifyEC2Instance checks that an EC2 instance with the specified tag exists and returns its instance ID.

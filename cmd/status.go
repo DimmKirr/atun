@@ -115,6 +115,7 @@ var statusCmd = &cobra.Command{
 			{"Config File", config.App.Config.ConfigFile},
 			{"Bastion Host", config.App.Config.BastionHostID},
 			{"Log Level", config.App.Config.LogLevel},
+			{"LOG_PLAIN_TEXT", fmt.Sprintf("%t", config.App.Config.LogPlainText)},
 
 			//{"Toggle", toggleValue},
 		}).WithLeftAlignment().Render()
