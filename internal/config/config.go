@@ -77,7 +77,7 @@ func LoadConfig() error {
 	viper.SetConfigType("toml")
 
 	// Set default log level early
-	viper.SetDefault("LOG_LEVEL", "warning")
+	viper.SetDefault("LOG_LEVEL", "info")
 
 	// Initialize the logger for a bit to provide early logging (using viper defaults)
 	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
