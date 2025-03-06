@@ -20,6 +20,8 @@ tasks:
       - chmod +x ./bin/atun
 
   test:
+    deps:
+      - build
     cmds:
       - go test -v --timeout 0 ./test/e2e
 #      - go test -v ./... -coverprofile=coverage.out -covermode=atomic
