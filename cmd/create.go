@@ -130,7 +130,7 @@ var createCmd = &cobra.Command{
 
 		// Create and start a fork of the default spinner.
 		var createBastionInstanceSpinner *pterm.SpinnerPrinter
-		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		if showSpinner {
 			createBastionInstanceSpinner = logger.StartCustomSpinner("Creating Ad-Hoc EC2 Bastion Instance...")

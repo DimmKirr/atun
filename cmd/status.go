@@ -43,7 +43,7 @@ var statusCmd = &cobra.Command{
 		bastionHost = cmd.Flag("bastion").Value.String()
 
 		var upTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
 		if bastionHost == "" {
@@ -115,7 +115,6 @@ var statusCmd = &cobra.Command{
 			{"Config File", config.App.Config.ConfigFile},
 			{"Bastion Host", config.App.Config.BastionHostID},
 			{"Log Level", config.App.Config.LogLevel},
-			{"LOG_PLAIN_TEXT", fmt.Sprintf("%t", config.App.Config.LogPlainText)},
 
 			//{"Toggle", toggleValue},
 		}).WithLeftAlignment().Render()

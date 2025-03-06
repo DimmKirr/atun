@@ -25,7 +25,7 @@ var deleteCmd = &cobra.Command{
 		// TODO: Add survey to check if the user is sure to destroy the stack
 
 		var deleteBastionInstanceSpinner *pterm.SpinnerPrinter
-		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		if showSpinner {
 			deleteBastionInstanceSpinner = logger.StartCustomSpinner("Deleting Ad-Hoc EC2 Bastion Instance...")
