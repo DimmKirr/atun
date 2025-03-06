@@ -7,6 +7,7 @@ package cmd
 import (
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
+	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/pterm/pterm"
@@ -24,7 +25,7 @@ var deleteCmd = &cobra.Command{
 		// TODO: Add survey to check if the user is sure to destroy the stack
 
 		var deleteBastionInstanceSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
 			deleteBastionInstanceSpinner = logger.StartCustomSpinner("Deleting Ad-Hoc EC2 Bastion Instance...")

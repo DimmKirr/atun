@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
+	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
@@ -42,7 +43,7 @@ var statusCmd = &cobra.Command{
 		bastionHost = cmd.Flag("bastion").Value.String()
 
 		var upTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
 		if bastionHost == "" {
