@@ -8,14 +8,18 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"testing"
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -62,7 +66,8 @@ func TestAtunCreateDelete(t *testing.T) {
 	t.Logf("VPC and Subnet created successfully %s, %s", vpcID, subnetID)
 
 	// Prepare Work Directory
-	workDir := prepareWorkDir(t, subnetID)
+	amiID := getLatestAMI(t, "al2023-ami-2023")
+	workDir := prepareWorkDir(t, subnetID, amiID)
 
 	// Run `atun create`
 	runAtunCommand(t, workDir, "create")
@@ -228,11 +233,12 @@ func createSubnet(t *testing.T, ec2Client *ec2.EC2, vpcID, tag string) string {
 }
 
 // prepareWorkDir generates a TOML file for Atun
-func prepareWorkDir(t *testing.T, subnetID string) string {
+func prepareWorkDir(t *testing.T, subnetID string, amiID string) string {
 	tmpDir, _ := os.MkdirTemp("", "atun")
 	content := fmt.Sprintf(`
 aws_profile = "localstack"
 bastion_subnet_id = "%s"
+bastion_host_ami = "%s"
 [[hosts]]
 name = "ipconfig.io"
 proto = "ssm"
@@ -244,7 +250,7 @@ name = "icanhazip.com"
 proto = "ssm"
 remote = "80"
 local = "10081"
-	`, subnetID)
+	`, subnetID, amiID)
 	filePath := filepath.Join(tmpDir, testAtunConfigFile)
 	_ = os.WriteFile(filePath, []byte(content), 0644)
 	return tmpDir
@@ -316,4 +322,59 @@ func verifyInstanceDeleted(t *testing.T, ec2Client *ec2.EC2, instanceID string) 
 	}
 
 	t.Logf("EC2 instance with ID %s has been successfully removed", instanceID)
+}
+
+// getLatestAMI fetches the latest AMI ID for a given family
+func getLatestAMI(t *testing.T, family string) string {
+	// Create EC2 client
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String(testAwsRegion),
+		Endpoint:    aws.String(os.Getenv("AWS_ENDPOINT_URL")),
+		Credentials: credentials.NewSharedCredentials(os.Getenv("AWS_SHARED_CREDENTIALS_FILE"), testAwsProfile),
+		DisableSSL:  aws.Bool(true),
+	}))
+	ec2Client := ec2.New(sess)
+
+	// Detect current architecture
+	arch := "x86_64"
+	if runtime.GOARCH == "arm64" {
+		arch = "arm64"
+	}
+
+	// Describe images with filters
+	input := &ec2.DescribeImagesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("name"),
+				Values: []*string{aws.String("al2023-ami-*")},
+			},
+			{
+				Name:   aws.String("state"),
+				Values: []*string{aws.String("available")},
+			},
+			{
+				Name:   aws.String("architecture"),
+				Values: []*string{aws.String(arch)},
+			},
+		},
+		Owners: []*string{aws.String("amazon")},
+	}
+
+	result, err := ec2Client.DescribeImages(input)
+	if err != nil {
+		t.Fatalf("Failed to describe images: %v", err)
+	}
+
+	if len(result.Images) == 0 {
+		t.Fatalf("No images found for family: %s and architecture: %s", family, arch)
+	}
+
+	// Sort images by creation date to get the latest
+	sort.Slice(result.Images, func(i, j int) bool {
+		timeI, _ := time.Parse(time.RFC3339, *result.Images[i].CreationDate)
+		timeJ, _ := time.Parse(time.RFC3339, *result.Images[j].CreationDate)
+		return timeI.After(timeJ)
+	})
+
+	return *result.Images[0].ImageId
 }

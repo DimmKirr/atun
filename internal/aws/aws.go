@@ -55,7 +55,11 @@ func InitAWSClients(app *config.Atun) {
 }
 
 func NewEC2Client(awsConfig aws.Config) (*ec2.EC2, error) {
-	logger.Debug("Creating EC2 client.", "AWSProfile", config.App.Config.AWSProfile, "awsRegion", config.App.Config.AWSRegion, "endpointURL", awsConfig.Endpoint)
+	logger.Debug("Creating EC2 client.",
+		"AWSProfile", config.App.Config.AWSProfile,
+		"awsRegion", config.App.Config.AWSRegion,
+		"endpointURL", aws.StringValue(awsConfig.Endpoint),
+	)
 
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Config:            awsConfig,

@@ -8,6 +8,10 @@ package infra
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
@@ -15,9 +19,6 @@ import (
 	"github.com/aws/jsii-runtime-go"
 	awsprovider "github.com/cdktf/cdktf-provider-aws-go/aws/v19/provider"
 	"github.com/hashicorp/terraform-cdk-go/cdktf"
-	"os"
-	"os/exec"
-	"path/filepath"
 )
 
 // createStack defines the CDKTF stack (generates Terraform).
@@ -178,18 +179,36 @@ func ApplyCDKTF(c *config.Config) error {
 	createStack(c)
 	// Change to the synthesized directory
 	synthDir := filepath.Join(c.TunnelDir, "stacks", fmt.Sprintf("%s-%s", c.AWSProfile, c.Env))
-	cmd := exec.Command("terraform", "init")
+	logger.Debug("Synthesized directory", "dir", synthDir)
+
+	// Ensure correct Terraform version is installed
+	if err := CheckTerraformVersion(); err != nil {
+		logger.Info("Installing required Terraform version", "version", c.TerraformVersion)
+		if err := InstallTerraform(c.TerraformVersion); err != nil {
+			return fmt.Errorf("failed to install terraform: %w", err)
+		}
+	}
+
+	// Get the path to the Terraform binary
+	terraformPath, err := GetTerraformPath()
+	if err != nil {
+		return fmt.Errorf("failed to get terraform path: %w", err)
+	}
+
+	// Initialize Terraform
+	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
 	if c.LogLevel == "info" || c.LogLevel == "debug" {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
 	if err := cmd.Run(); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize terraform: %w", err)
 	}
 
-	// TODO: Manage Terraform / OpenTofu Install
-	cmd = exec.Command("terraform", "apply", "-auto-approve")
+	// Apply Terraform
+	cmd = exec.Command(terraformPath, "apply", "-auto-approve")
+	logger.Debug("Running terraform apply", "cmd", cmd)
 	cmd.Dir = synthDir
 	if c.LogLevel == "info" || c.LogLevel == "debug" {
 		cmd.Stdout = os.Stdout
@@ -203,18 +222,34 @@ func DestroyCDKTF(c *config.Config) error {
 	createStack(c)
 	// Change to the synthesized directory
 	synthDir := filepath.Join(c.TunnelDir, "stacks", fmt.Sprintf("%s-%s", c.AWSProfile, c.Env))
-	cmd := exec.Command("terraform", "init")
+
+	// Ensure correct Terraform version is installed
+	if err := CheckTerraformVersion(); err != nil {
+		logger.Info("Installing required Terraform version", "version", c.TerraformVersion)
+		if err := InstallTerraform(c.TerraformVersion); err != nil {
+			return fmt.Errorf("failed to install terraform: %w", err)
+		}
+	}
+
+	// Get the path to the Terraform binary
+	terraformPath, err := GetTerraformPath()
+	if err != nil {
+		return fmt.Errorf("failed to get terraform path: %w", err)
+	}
+
+	// Initialize Terraform
+	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
 	if c.LogLevel == "info" || c.LogLevel == "debug" {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
 	if err := cmd.Run(); err != nil {
-		return err
+		return fmt.Errorf("failed to initialize terraform: %w", err)
 	}
 
-	// TODO: Manage Install Terraform
-	cmd = exec.Command("terraform", "destroy", "-auto-approve")
+	// Destroy Terraform
+	cmd = exec.Command(terraformPath, "destroy", "-auto-approve")
 	cmd.Dir = synthDir
 	if c.LogLevel == "info" || c.LogLevel == "debug" {
 		cmd.Stdout = os.Stdout
