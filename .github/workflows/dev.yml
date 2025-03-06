@@ -14,7 +14,6 @@ permissions:
 
 env:
   RELEASE_VERSION: v0.0.0
-  ATUN_LOG_PLAIN_TEXT: true
 
 jobs:
   goreleaser:
