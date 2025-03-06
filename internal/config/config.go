@@ -154,8 +154,8 @@ func LoadConfig() error {
 	viper.SetDefault("BASTION_INSTANCE_NAME", "atun-bastion")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
-	viper.SetDefault("LOG_PLAIN_TEXT", false)
-	viper.SetDefault("TERRAFORM_VERSION", "latest") // Default to latest Terraform version
+	viper.SetDefault("LOG_PLAIN_TEXT", false)               // Set LOG_PLAIN_TEXT to false by default
+	viper.SetDefault("TERRAFORM_VERSION", "latest")         // Default to latest Terraform version
 
 	// TODO?: Move init a separate file with correct imports of config
 	App = &Atun{
