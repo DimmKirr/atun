@@ -39,7 +39,7 @@ brews:
   - name: atun-dev
     repository:
       owner: AutomationD
-      name: homebrew-atun
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula
@@ -61,7 +61,7 @@ brews:
   - name: atun-dev@{{ .Version }}
     repository:
       owner: AutomationD
-      name: homebrew-atun
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula

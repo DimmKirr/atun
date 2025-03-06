@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  RELEASE_VERSION: 0.0.0
+  RELEASE_VERSION: v0.0.0
   ATUN_LOG_PLAIN_TEXT: true
 
 jobs:
