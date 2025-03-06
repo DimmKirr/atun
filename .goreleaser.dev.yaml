@@ -54,7 +54,7 @@ brews:
       - atun
       - atun@{{ .Version }}
     test: |
-      system "#{bin}/atun --version"
+      system "#{bin}/atun version"
     install: |
       bin.install "atun"
 
@@ -73,6 +73,6 @@ brews:
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
     test: |
-      system "#{bin}/atun --version"
+      system "#{bin}/atun version"
     install: |
       bin.install "atun"
