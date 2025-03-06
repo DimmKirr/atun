@@ -19,7 +19,7 @@ builds:
 
 archives:
   - id: release_archive
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -33,7 +33,7 @@ release:
   make_latest: false
 
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  name_template: "{{ .ProjectName }}-checksums.txt"
 
 brews:
   - name: atun
