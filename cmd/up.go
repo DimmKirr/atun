@@ -44,7 +44,7 @@ var upCmd = &cobra.Command{
 
 		logger.Debug("All constraints satisfied")
 		var upTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		if showSpinner {
 			upTunnelSpinner = logger.StartCustomSpinner(
