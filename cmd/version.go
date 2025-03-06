@@ -7,12 +7,11 @@ package cmd
 
 import (
 	"github.com/automationd/atun/internal/config"
+	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/version"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
-	"os"
 )
 
 // versionCmd represents the version command
@@ -28,7 +27,7 @@ var versionCmd = &cobra.Command{
 		// Detect if current terminal is capable of displaying ASCII art
 		// If not, disable it
 
-		if !config.App.Config.LogPlainText && isInteractiveTerminal() {
+		if !config.App.Config.LogPlainText && constraints.IsInteractiveTerminal() {
 			//stopChan := make(chan struct{})
 			//go func() {
 
@@ -56,11 +55,6 @@ var versionCmd = &cobra.Command{
 		}
 
 	},
-}
-
-// isInteractiveTerminal checks if the current terminal is interactive
-func isInteractiveTerminal() bool {
-	return terminal.IsTerminal(int(os.Stdin.Fd()))
 }
 
 func init() {

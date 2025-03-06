@@ -10,6 +10,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/go-ini/ini"
 	"github.com/pterm/pterm"
+	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"log"
 	"net/http"
@@ -215,4 +216,9 @@ func GetOSRelease(configfile string) (map[string]string, error) {
 	ConfigParams["ID"] = cfg.Section("").Key("ID").String()
 
 	return ConfigParams, nil
+}
+
+// IsInteractiveTerminal checks if the current terminal is interactive
+func IsInteractiveTerminal() bool {
+	return terminal.IsTerminal(int(os.Stdin.Fd()))
 }
