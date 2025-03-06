@@ -27,7 +27,7 @@ var versionCmd = &cobra.Command{
 		// Detect if current terminal is capable of displaying ASCII art
 		// If not, disable it
 
-		if !config.App.Config.LogPlainText && constraints.IsInteractiveTerminal() {
+		if !config.App.Config.LogPlainText && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes() {
 			//stopChan := make(chan struct{})
 			//go func() {
 

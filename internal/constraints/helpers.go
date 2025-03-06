@@ -224,3 +224,15 @@ func IsInteractiveTerminal() bool {
 	logger.Debug("Terminal", "interactive", terminalInteractive)
 	return terminalInteractive
 }
+
+// SupportsANSIEscapeCodes checks if the terminal supports ANSI escape codes
+func SupportsANSIEscapeCodes() bool {
+	if !IsInteractiveTerminal() {
+		return false
+	}
+
+	// Attempt to move the cursor up one line using ANSI escape code
+	_, err := os.Stdout.WriteString("\033[A")
+
+	return err == nil
+}
