@@ -6,7 +6,6 @@ defaults:
 env:
   AWS_PROFILE: default
   AWS_REGION: us-east-1
-  ATUN_LOG_PLAIN_TEXT: true
 
 on:
   workflow_dispatch:

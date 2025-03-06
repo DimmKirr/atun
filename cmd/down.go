@@ -45,7 +45,7 @@ var downCmd = &cobra.Command{
 		}
 
 		var downTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
+		showSpinner := constraints.IsInteractiveTerminal() || config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info"
 
 		bastionHost = cmd.Flag("bastion").Value.String()
 
