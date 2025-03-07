@@ -13,6 +13,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
+	"github.com/automationd/atun/internal/ux"
 	"github.com/spf13/viper"
 
 	"github.com/pterm/pterm"
@@ -47,7 +48,7 @@ var statusCmd = &cobra.Command{
 
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
 		if bastionHost == "" {
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+			config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
 			if err != nil {
 				if showSpinner {
 					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
@@ -56,12 +57,12 @@ var statusCmd = &cobra.Command{
 					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
 				}
 
-				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
 				if err != nil {
 					logger.Fatal("Error discovering bastion host", "error", err)
 				}
 				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-				upTunnelSpinner = logger.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+				upTunnelSpinner = ux.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
 
 				// TODO: suggest creating a bastion host.
 				// Use survey to ask if the user wants to create a bastion host
@@ -80,6 +81,7 @@ var statusCmd = &cobra.Command{
 
 		config.App.Version = bastionHostConfig.Version
 		config.App.Config.Hosts = bastionHostConfig.Config.Hosts
+		config.App.Config.BastionHostUser = bastionHostConfig.Config.BastionHostUser
 
 		tunnelIsUp, connections, err := ssh.GetSSHTunnelStatus(config.App)
 
@@ -88,7 +90,7 @@ var statusCmd = &cobra.Command{
 			logger.Error("Failed to render connections table", "error", err)
 		}
 
-		config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+		config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
 		if err != nil {
 			logger.Error("Bastion host not found. You might want to create it.", "error", err)
 		}
@@ -114,6 +116,9 @@ var statusCmd = &cobra.Command{
 			{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
 			{"Config File", config.App.Config.ConfigFile},
 			{"Bastion Host", config.App.Config.BastionHostID},
+			{"Bastion Host User", config.App.Config.BastionHostUser},
+			{"Socket Path", ssh.GetBastionSockFilePath(config.App)},
+			{"SSH Config File", ssh.GetSSHConfigFilePath(config.App)},
 			{"Log Level", config.App.Config.LogLevel},
 
 			//{"Toggle", toggleValue},

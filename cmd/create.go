@@ -14,6 +14,7 @@ import (
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/tunnel"
+	"github.com/automationd/atun/internal/ux"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"log"
@@ -133,7 +134,7 @@ var createCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		if showSpinner {
-			createBastionInstanceSpinner = logger.StartCustomSpinner("Creating Ad-Hoc EC2 Bastion Instance...")
+			createBastionInstanceSpinner = ux.StartCustomSpinner("Creating Ad-Hoc EC2 Bastion Instance...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Creating Ad-Hoc EC2 Bastion Instance...")
@@ -153,7 +154,7 @@ var createCmd = &cobra.Command{
 		}
 
 		// Get BastionHostID
-		config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+		config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
 		if err != nil {
 			logger.Fatal("Error discovering bastion host", "error", err)
 		}

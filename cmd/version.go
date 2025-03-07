@@ -8,7 +8,7 @@ package cmd
 import (
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/automationd/atun/internal/ux"
 	"github.com/automationd/atun/internal/version"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -31,7 +31,7 @@ var versionCmd = &cobra.Command{
 			//stopChan := make(chan struct{})
 			//go func() {
 
-			logger.RenderAsciiArt()
+			ux.RenderAsciiArt()
 
 			//close(stopChan)
 			//}()

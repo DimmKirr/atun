@@ -199,6 +199,129 @@ func GetAccountId() string {
 	return *result.Account
 }
 
+// CheckIfSSHPublicKeyIsPresent checks if the SSH public key is present in the instance
+func CheckIfSSHPublicKeyIsPresent(instanceID string, publicKey string, bastionHostUser string) (bool, error) {
+	bastionHostUserDirectory := fmt.Sprintf("/home/%s", bastionHostUser)
+	if bastionHostUser == "root" {
+		bastionHostUserDirectory = "/root"
+	}
+
+	// Inverting exit codes to catch the case when the key is not present. Found returns 0, not found returns 1
+	command := fmt.Sprintf(
+		`bash -c 'grep "%s" %s/.ssh/authorized_keys'`,
+		strings.TrimSpace(publicKey),
+		bastionHostUserDirectory,
+	)
+
+	logger.Debug("Sending SSM command to check SSH public key presence", "command", command)
+
+	sendCommandOutput, err := ssm.New(config.App.Session).SendCommand(&ssm.SendCommandInput{
+		InstanceIds:  []*string{&instanceID},
+		DocumentName: aws.String("AWS-RunShellScript"),
+		Comment:      aws.String("Check if SSH public key is present in authorized_keys"),
+		Parameters: map[string][]*string{
+			"commands": {&command},
+		},
+	})
+	if err != nil {
+		return false, fmt.Errorf("can't send SSM command to check SSH public key: %w", err)
+	}
+
+	commandID := *sendCommandOutput.Command.CommandId
+	logger.Debug("SSM command sent. Waiting for completion", "commandID", commandID)
+
+	var output *ssm.GetCommandInvocationOutput
+	for i := 0; i < 5; i++ {
+		output, err = ssm.New(config.App.Session).GetCommandInvocation(&ssm.GetCommandInvocationInput{
+			CommandId:  aws.String(commandID),
+			InstanceId: aws.String(instanceID),
+		})
+		if err == nil && *output.Status == ssm.CommandInvocationStatusSuccess && output.ResponseCode != nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if err != nil {
+		return false, fmt.Errorf("can't get command invocation: %w", err)
+	}
+
+	if strings.Contains(config.App.Config.AWSEndpointUrl, "localhost") || strings.Contains(config.App.Config.AWSEndpointUrl, "127.0.0.1") {
+		if *output.Status != "Success" {
+			return false, fmt.Errorf("command failed %s: %s", *output.StandardOutputContent, *output.StandardErrorContent)
+		}
+		return true, nil
+	}
+
+	if output != nil {
+		if *output.ResponseCode != 0 && *output.Status != "Success" {
+			return false, fmt.Errorf("command failed with exit code %d: %s", *output.ResponseCode, *output.StandardErrorContent)
+		}
+
+		if strings.Contains(*output.StandardOutputContent, publicKey) {
+			return true, nil
+		}
+
+		return false, nil
+	} else {
+		return false, fmt.Errorf("no output from command")
+	}
+
+}
+
+// GetSSMWhoAmI checks if the SSH public key is present in the instance
+func GetSSMWhoAmI(instanceID string, bastionHostUser string) (string, error) {
+	command := fmt.Sprintf(
+		`bash -c 'whoami'`,
+	)
+
+	logger.Debug("Sending SSM command", "command", command)
+
+	sendCommandOutput, err := ssm.New(config.App.Session).SendCommand(&ssm.SendCommandInput{
+		InstanceIds:  []*string{&instanceID},
+		DocumentName: aws.String("AWS-RunShellScript"),
+		Comment:      aws.String("Check if SSH public key is present in authorized_keys"),
+		Parameters: map[string][]*string{
+			"commands": {&command},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("can't send command: %w", err)
+	}
+
+	commandID := *sendCommandOutput.Command.CommandId
+	logger.Debug("SSM command sent. Waiting for completion", "commandID", commandID)
+
+	var output *ssm.GetCommandInvocationOutput
+	for i := 0; i < 5; i++ {
+		output, err = ssm.New(config.App.Session).GetCommandInvocation(&ssm.GetCommandInvocationInput{
+			CommandId:  aws.String(commandID),
+			InstanceId: aws.String(instanceID),
+		})
+		if err == nil && *output.Status == ssm.CommandInvocationStatusSuccess && output.ResponseCode != nil {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if err != nil {
+		return "", fmt.Errorf("can't get command invocation: %w", err)
+	}
+
+	if strings.Contains(config.App.Config.AWSEndpointUrl, "localhost") || strings.Contains(config.App.Config.AWSEndpointUrl, "127.0.0.1") {
+		if *output.Status != "Success" {
+			return "", fmt.Errorf("command failed %s: %s", *output.StandardOutputContent, *output.StandardErrorContent)
+		}
+		return "localstack", nil
+	}
+
+	if *output.ResponseCode != 0 && *output.Status != "Success" {
+		return "", fmt.Errorf("command failed with exit code %d: %s", *output.ResponseCode, *output.StandardErrorContent)
+	}
+
+	whoamiResponse := *output.StandardOutputContent
+
+	return whoamiResponse, nil
+}
+
 func SendSSHPublicKey(instanceID string, publicKey string, bastionHostUser string) error {
 	// This command is executed in the bastion host and it checks if our public publicKey is present. If it's not it uploads it to the authorized_keys file.
 	// If the bastionHostUser is "root" then set bastionHostUserDirectory to /root otherwise set it to /home/bastionHostUser
@@ -231,7 +354,7 @@ func SendSSHPublicKey(instanceID string, publicKey string, bastionHostUser strin
 	}
 
 	commandID := *sendCommandOutput.Command.CommandId
-	logger.Debug("Command sent. Waiting for completion", "commandID", commandID)
+	logger.Debug("SSM command sent. Waiting for completion", "commandID", commandID)
 
 	var output *ssm.GetCommandInvocationOutput
 	for i := 0; i < 5; i++ {

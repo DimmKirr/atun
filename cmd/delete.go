@@ -10,6 +10,7 @@ import (
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/infra"
 	"github.com/automationd/atun/internal/logger"
+	"github.com/automationd/atun/internal/ux"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -28,7 +29,7 @@ var deleteCmd = &cobra.Command{
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		if showSpinner {
-			deleteBastionInstanceSpinner = logger.StartCustomSpinner("Deleting Ad-Hoc EC2 Bastion Instance...")
+			deleteBastionInstanceSpinner = ux.StartCustomSpinner("Deleting Ad-Hoc EC2 Bastion Instance...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
 			logger.Info("Deleting Ad-Hoc EC2 Bastion Instance...")
