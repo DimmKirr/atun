@@ -81,7 +81,7 @@ func LoadConfig() error {
 
 	// Initialize the logger for a bit to provide early logging (using viper defaults)
 	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
-	logger.Debug("Initialized config")
+	logger.Debug("Initialized Logger")
 
 	currentDir, err := os.Getwd()
 	if err != nil {

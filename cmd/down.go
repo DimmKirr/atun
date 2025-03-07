@@ -13,7 +13,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
-	"github.com/pterm/pterm"
+	"github.com/automationd/atun/internal/ux"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +25,8 @@ var downCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger.Debug("Down command called")
 		var (
-			err         error
-			bastionHost string
+			err           error
+			bastionHostID string
 		)
 
 		// Check Constraints
@@ -44,51 +44,45 @@ var downCmd = &cobra.Command{
 			return err
 		}
 
-		var downTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
+		downTunnelSpinner := ux.NewProgressSpinner("Stopping SSM tunnel")
 
-		bastionHost = cmd.Flag("bastion").Value.String()
+		bastionHostID = cmd.Flag("bastion").Value.String()
 
-		aws.InitAWSClients(config.App)
-
-		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
-		if bastionHost == "" {
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+		// If bastion ID is not provided via a flag
+		if bastionHostID == "" {
+			bastionHostID, err = ssh.GetBastionHostIDFromExistingSession(config.App.Config.TunnelDir)
 			if err != nil {
-				logger.Fatal("Error discovering bastion host", "error", err)
+				downTunnelSpinner.UpdateText("Couldn't get bastion host ID locally. Trying with AWS", "error", err)
 			}
-		} else {
-			config.App.Config.BastionHostID = bastionHost
+
+			downTunnelSpinner.UpdateText("Authenticating with AWS")
+
+			aws.InitAWSClients(config.App)
+
+			config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+			if err != nil {
+				downTunnelSpinner.Fail("No Bastion hosts found with atun.io tags and no bastion host provided", "error", err)
+			}
 		}
 
-		logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-
-		tunnelStarted, _, err := ssh.GetSSHTunnelStatus(config.App)
-
+		tunnelActive, _, err := ssh.GetSSHTunnelStatus(config.App)
 		if err != nil {
-			logger.Error("Failed to get tunnel status", "error", err)
+			downTunnelSpinner.Fail("Failed to get tunnel status", "error", err)
 		}
 
-		if tunnelStarted {
-			if showSpinner {
-				downTunnelSpinner = logger.StartCustomSpinner("Stopping tunnel...")
-			} else {
-				logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
-				logger.Info("Stopping tunnel...")
-			}
-			logger.Debug("Tunnel status", "status", tunnelStarted)
+		if tunnelActive {
+			downTunnelSpinner.UpdateText("Tunnel is active", "tunnelActive", tunnelActive, "bastionHostID", config.App.Config.BastionHostID)
 
-			logger.Debug("All constraints satisfied")
-
-			tunnelStarted, err = ssh.StopSSHTunnel(config.App)
+			downTunnelSpinner.UpdateText("Deactivating tunnel")
+			tunnelActive, err = ssh.StopSSHTunnel(config.App)
 			if err != nil {
-				logger.Error("Failed to stop tunnel", "error", err)
+				downTunnelSpinner.Fail("Failed to deactivate tunnel", "error", err)
 			}
-		}
-		if showSpinner {
-			downTunnelSpinner.Success("Tunnel is stopped")
+
+			downTunnelSpinner.UpdateText("Tunnel inactive", "tunnelActive", tunnelActive)
+
 		} else {
-			logger.Debug("Tunnel status", "status", tunnelStarted)
+			downTunnelSpinner.UpdateText("Tunnel inactive", "tunnelActive", tunnelActive)
 		}
 
 		// Get delete flag
@@ -96,7 +90,7 @@ var downCmd = &cobra.Command{
 		deleteBastion, _ := cmd.Flags().GetBool("delete")
 
 		if deleteBastion {
-			logger.Info("Delete flag is set. Deleting bastion host", "bastion", config.App.Config.BastionHostID)
+			downTunnelSpinner.UpdateText("Delete flag is set. Deleting bastion host", "bastionHostID", config.App.Config.BastionHostID)
 
 			// Run create command from here
 			err := deleteCmd.RunE(deleteCmd, args)

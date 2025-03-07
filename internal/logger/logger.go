@@ -6,12 +6,12 @@
 package logger
 
 import (
-	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
+
+	"github.com/pterm/pterm"
 )
 
 var defaultLogger *slog.Logger
@@ -52,27 +52,26 @@ func ApplyPtermTheme() {
 
 // Initialize sets up the logger with a specified log level
 func Initialize(logLevel string, logPlainText bool) {
-
-	// Map log levels from configuration to slog
-	var slogLevel slog.Level
+	// Map log levels from configuration to pterm log levels
+	var ptermLogLevel pterm.LogLevel
 	switch strings.ToLower(logLevel) {
 	case "debug":
-		slogLevel = slog.LevelDebug
+		ptermLogLevel = pterm.LogLevelDebug
 	case "info":
-		slogLevel = slog.LevelInfo
+		ptermLogLevel = pterm.LogLevelInfo
 	case "warning":
-		slogLevel = slog.LevelWarn
+		ptermLogLevel = pterm.LogLevelWarn
 	case "error":
-		slogLevel = slog.LevelError
+		ptermLogLevel = pterm.LogLevelError
 	case "fatal":
-		slogLevel = slog.LevelError
+		ptermLogLevel = pterm.LogLevelError
 	default:
-		slogLevel = slog.LevelInfo
+		ptermLogLevel = pterm.LogLevelInfo
 	}
 
 	// Configure slog with a text handler
 	handler := pterm.NewSlogHandler(&pterm.DefaultLogger)
-	pterm.DefaultLogger.Level = pterm.LogLevel(slogLevel)
+	pterm.DefaultLogger.Level = ptermLogLevel
 	if !logPlainText {
 		// Use text-only logging style
 		ApplyPtermTheme()
@@ -80,7 +79,6 @@ func Initialize(logLevel string, logPlainText bool) {
 
 	// Create a new slog logger with the handler
 	defaultLogger = slog.New(handler)
-
 }
 
 // Info logs an info message
@@ -110,42 +108,10 @@ func Fatal(msg string, keysAndValues ...interface{}) {
 }
 
 // Success prints a user-facing success message with optional centralized control
-func Success(msg string) {
-	if viper.GetBool("QUIET") {
-		return
-	}
-
-	pterm.Success.Println(msg)
-}
-
-// StartCustomSpinner creates and starts a fresh custom spinner
-func StartCustomSpinner(message string) *pterm.SpinnerPrinter {
-	// Clone DefaultSpinner as a new variable
-	spinner := pterm.DefaultSpinner // Direct assignment to create a new copy
-
-	// Customize the spinner
-	spinner.Sequence = []string{
-		"    🐟",
-		"   🐟 ",
-		"  🐟  ",
-		" 🐟   ",
-		"🐟    ",
-		"🫧    ",
-	}
-
-	spinner.Style = pterm.NewStyle(pterm.FgCyan) // Custom color
-	spinner.Delay = 150 * time.Millisecond       // Frame delay
-
-	// Start the spinner
-	s, _ := spinner.Start(message)
-	return s
+func Success(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Info(msg, keysAndValues...)
 }
 
 func init() {
-	// Initialize the logger with the default log level
-	if os.Getenv("TERM") != "xterm-256color" {
-		Initialize(viper.GetString("LOG_LEVEL"), true)
-	}
 	Initialize(viper.GetString("LOG_LEVEL"), false)
-
 }

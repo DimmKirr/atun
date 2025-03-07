@@ -72,7 +72,7 @@ ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartS
 		sshConfigContent += fmt.Sprintf("LocalForward %d %s:%d\n", host.Local, host.Name, host.Remote)
 	}
 
-	sshConfigFilePath := getSSHConfigFilePath(app)
+	sshConfigFilePath := GetSSHConfigFilePath(app)
 	sshConfigFile, err := os.Create(sshConfigFilePath)
 	//sshConfigFile, err := os.CreateTemp(os.TempDir(), "atun-ssh.config")
 	if err != nil {
@@ -109,11 +109,11 @@ func GetSSMPluginStatus(app *config.Atun) (bool, error) {
 func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 	// TODO: Add port check too to make sure to see outrun tunnels
 
-	bastionSockFilePath := getBastionSockFilePath(app)
+	bastionSockFilePath := GetBastionSockFilePath(app)
 
 	// If a bastion socket file exists, check the tunnel status
 	if _, err := os.Stat(bastionSockFilePath); !os.IsNotExist(err) {
-		logger.Info("A tunnel socket from has been found", "path", bastionSockFilePath)
+		logger.Debug("An existing tunnel socket found", "path", bastionSockFilePath)
 
 		// Pass "check" command to see if the socket has a valid SSH connection
 		args := []string{"ssh", "-S", bastionSockFilePath, "-O", "check", ""}
@@ -174,7 +174,7 @@ func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 }
 
 func StartSSHTunnel(app *config.Atun) error {
-	bastionSockFilePath := getBastionSockFilePath(app)
+	bastionSockFilePath := GetBastionSockFilePath(app)
 
 	args := []string{}
 
@@ -262,7 +262,7 @@ func StartSSHTunnel(app *config.Atun) error {
 
 	}
 
-	logger.Info("SSH process started in the background", "pid", c.Process.Pid)
+	logger.Debug("SSH process started in the background", "pid", c.Process.Pid)
 
 	// Disown the process if the parent process is terminating
 	// This ensures the child process doesn't get terminated when the parent exits
@@ -273,12 +273,14 @@ func StartSSHTunnel(app *config.Atun) error {
 	return nil
 }
 
+// StopSSHTunnel stops the SSH tunnel and returns false if the tunnel is not running
 func StopSSHTunnel(app *config.Atun) (bool, error) {
-	bastionSockFilePath := getBastionSockFilePath(app)
+	bastionSockFilePath := GetBastionSockFilePath(app)
+	tunnelConfigFilePath := GetSSHConfigFilePath(app)
 
 	// If a bastion socket file exists, check the tunnel status
 	if _, err := os.Stat(bastionSockFilePath); !os.IsNotExist(err) {
-		logger.Info("A tunnel socket from has been found", "path", bastionSockFilePath)
+		logger.Debug("A tunnel socket from has been found", "path", bastionSockFilePath)
 
 		args := []string{"ssh", "-S", bastionSockFilePath, "-O", "exit", ""}
 
@@ -294,21 +296,41 @@ func StopSSHTunnel(app *config.Atun) (bool, error) {
 		if err := cmd.Run(); err != nil {
 			return false, fmt.Errorf("failed to exit tunnel: %w", err)
 		}
+	}
 
-		return true, nil
+	// Check if the bastion socket file exists and remove it if it does
+	if _, err := os.Stat(tunnelConfigFilePath); err == nil {
+		if err := os.Remove(tunnelConfigFilePath); err != nil {
+			return false, fmt.Errorf("failed to remove bastion config file: %w", err)
+		}
+		logger.Debug("Removed bastion config file", "path", tunnelConfigFilePath)
+	}
+
+	tunnelActive, _, err := GetSSHTunnelStatus(app)
+	if err != nil {
+		return false, fmt.Errorf("failed to get tunnel status: %w", err)
+	}
+
+	if !tunnelActive {
+		return tunnelActive, nil
+	}
+
+	logger.Error("Tunnel is still active. Likely a bug")
+	return true, nil
+}
+
+func GetBastionSockFilePath(app *config.Atun) string {
+	logger.Debug("Getting bastion socket file path", "tunnelDir", app.Config.TunnelDir, "env", app.Config.Env, "bastionHostID", app.Config.BastionHostID)
+
+	if app.Config.BastionHostID == "" {
+		logger.Debug("Can't find Bastion Host ID is not set. Assuming bastion id from existing socket file")
 
 	}
 
-	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", bastionSockFilePath)
-	return false, nil
-}
-
-func getBastionSockFilePath(app *config.Atun) string {
-	logger.Debug("Getting bastion socket file path", "tunnelDir", app.Config.TunnelDir, "env", app.Config.Env, "bastionHostID", app.Config.BastionHostID)
 	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-tunnel.sock", app.Config.BastionHostID))
 }
 
-func getSSHConfigFilePath(app *config.Atun) string {
+func GetSSHConfigFilePath(app *config.Atun) string {
 	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-ssh.config", app.Config.BastionHostID))
 }
 
@@ -394,6 +416,33 @@ func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 	return runningTunnels, nil
 }
 
+// TrySSHConnection tries to establish an SSH connection to the bastion host
+func TrySSHConnection(app *config.Atun) error {
+	bastionSockFilePath := GetBastionSockFilePath(app)
+
+	args := []string{"-S", bastionSockFilePath, "-O", "check", fmt.Sprintf("%s@%s", app.Config.BastionHostUser, app.Config.BastionHostID)}
+
+	cmd := exec.Command("ssh", args...)
+	cmd.Dir = app.Config.AppDir
+
+	if app.Config.LogLevel == "debug" {
+		cmd.Args = append(cmd.Args, "-vvv")
+	}
+
+	logger.Debug("Running SSH command", "command", cmd.String())
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection: %w", err)
+	}
+
+	if strings.Contains(string(output), "Master running") {
+		logger.Debug("SSH connection established successfully")
+		return nil
+	}
+
+	return fmt.Errorf("failed to establish SSH connection: %s", output)
+}
+
 // CheckPort checks if the port is occupied and returns true/false and also process name
 func CheckPort(port int) (bool, string, error) {
 	logger.Debug("Checking port", "port", port)
@@ -458,4 +507,35 @@ func getProcessNameByPID(pid int) (string, error) {
 	}
 
 	return name, nil
+}
+
+// getBastionHostIDFromSocket gets the bastion host ID from the bastion socket file
+func GetBastionHostIDFromExistingSession(tunnelDir string) (string, error) {
+	files, err := os.ReadDir(tunnelDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read tunnel directory: %w", err)
+	}
+
+	var tunnelFiles []string
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), "-tunnel.sock") {
+			tunnelFiles = append(tunnelFiles, file.Name())
+		}
+	}
+
+	logger.Debug("Tunnel socket files", "files", tunnelFiles)
+
+	if len(tunnelFiles) > 1 {
+		return "", fmt.Errorf("multiple bastion host IDs found in the tunnel directory %s. Likely due to abnormal termination before. Please clean up manually", tunnelDir)
+	}
+
+	if len(tunnelFiles) == 1 {
+		bastionHostID := strings.TrimSuffix(tunnelFiles[0], "-tunnel.sock")
+		return bastionHostID, nil
+	}
+
+	// TODO: attempt to get it from ssm processes
+
+	return "", fmt.Errorf("no bastion host ID found in the tunnel directory")
 }

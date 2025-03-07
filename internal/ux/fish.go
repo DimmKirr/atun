@@ -1,9 +1,9 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * SPDX-FileCopyrightText: © 2024 Dmitry Kireev
+ * SPDX-FileCopyrightText: © 2025 Dmitry Kireev
  */
 
-package logger
+package ux
 
 import (
 	"github.com/pterm/pterm"
@@ -102,22 +102,6 @@ func RenderAsciiArt() {
 		close(stopChan)
 	}()
 
-	// Keyboard listener
-	//go func() {
-	//	if err := keyboard.Open(); err != nil {
-	//		panic(err)
-	//	}
-	//	defer keyboard.Close()
-	//
-	//	for {
-	//		char, key, err := keyboard.GetKey()
-	//		if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter || key == keyboard.KeyCtrlC) {
-	//			stopChan <- struct{}{}
-	//			break
-	//		}
-	//	}
-	//}()
-
 	<-stopChan
 
 	// Clear the fish area and reset terminal display
@@ -132,17 +116,6 @@ func generateFrame(fishes []Fish, bubbles []Bubble, width int, height int) strin
 	//barPattern := []int{1, 1, 1, 1, 1}
 	for y := 0; y < height; y++ {
 		line := ""
-
-		//// Add bars based on the bar pattern
-		//for i := 0; i < barPattern[y%len(barPattern)]; i++ {
-		//	line += "█"
-		//}
-
-		//Add spaces to fill up the rest of the left boundary
-		//for i := barPattern[y%len(barPattern)]; i < 3; i++ {
-		//	line += " "
-		//}
-
 		// Generate animation to the right of the bars
 		for x := 3; x < width; x++ {
 			char := " "

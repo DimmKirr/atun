@@ -21,9 +21,9 @@ import (
 	"strings"
 )
 
-// GetBastionHostID retrieves the Bastion Host ID from AWS tags.
+// GetBastionHostIDFromTags retrieves the Bastion Host ID from AWS tags.
 // It takes a session, tag name, and tag value as parameters and returns the instance ID of the Bastion Host.
-func GetBastionHostID() (string, error) {
+func GetBastionHostIDFromTags() (string, error) {
 	// First try to find bastion host id from the running process
 	runningTunnels, err := ssh.GetRunningTunnels(config.App)
 	logger.Debug("Running tunnels", "tunnels", runningTunnels)

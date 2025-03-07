@@ -7,6 +7,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/automationd/atun/internal/ux"
+	"os"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
@@ -14,9 +17,7 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 // upCmd represents the up command
@@ -36,31 +37,16 @@ var upCmd = &cobra.Command{
 		if err := constraints.CheckConstraints(
 			constraints.WithSSMPlugin(),
 			constraints.WithAWSProfile(),
-			//constraints.WithAWSRegion(), // Can be derived on the session level
 			constraints.WithENV(),
 		); err != nil {
 			return err
 		}
 
 		logger.Debug("All constraints satisfied")
-		var upTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
-		if showSpinner {
-			upTunnelSpinner = logger.StartCustomSpinner(
-				fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID),
-			)
-		} else {
-			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
-			logger.Info("Starting tunnel via EC2 Bastion Instance...")
-		}
+		upTunnelSpinner := ux.NewProgressSpinner("Activating SSM tunnel")
 
-		if showSpinner {
-			upTunnelSpinner.UpdateText("Authenticating with AWS...")
-
-		} else {
-			logger.Debug("Authenticating with AWS")
-		}
+		upTunnelSpinner.UpdateText("Authenticating with AWS...")
 		aws.InitAWSClients(config.App)
 
 		// Get the bastion host ID from the command line
@@ -68,20 +54,27 @@ var upCmd = &cobra.Command{
 
 		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
 		if bastionHost == "" {
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
-			if err != nil {
-				if showSpinner {
-					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
+			upTunnelSpinner.UpdateText("Discovering bastion host...")
 
-				} else {
-					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
-				}
+			config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+			if err != nil {
+				upTunnelSpinner.Warning("No bastion hosts found with atun.io tags.")
+				//if showSpinner {
+				//	upTunnelSpinner.Warning("No bastion hosts found with atun.io tags.")
+				//} else {
+				//	logger.Warn("No bastion hosts found with atun.io tags.", "error", err)
+				//}
 
 				// Get default from the flags
 				createHost, _ := cmd.Flags().GetBool("create")
 
 				// If the create flag is not set ask if the user wants to create a bastion host
 				if !createHost {
+					if !constraints.IsInteractiveTerminal() {
+						upTunnelSpinner.Fail("No bastion host found and not running in an interactive terminal. Exiting.")
+						os.Exit(1)
+					}
+
 					err = survey.AskOne(&survey.Confirm{
 						Message: fmt.Sprintf("Would you like to create an ad-hoc bastion host? (It's easy to cleanly delete)"),
 						Default: true,
@@ -93,7 +86,7 @@ var upCmd = &cobra.Command{
 				}
 
 				if !createHost {
-					logger.Info("Bastion host creation cancelled. Exiting.")
+					upTunnelSpinner.UpdateText("Bastion host creation cancelled. Exiting.")
 					os.Exit(1)
 				}
 
@@ -102,15 +95,17 @@ var upCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("error running createCmd: %w", err)
 				}
+				upTunnelSpinner.UpdateText("Discovering bastion host...")
 
-				logger.Debug("Created host")
-
-				config.App.Config.BastionHostID, err = tunnel.GetBastionHostID()
+				config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
 				if err != nil {
-					logger.Fatal("Error discovering bastion host", "error", err)
+					logger.Debug("Error discovering bastion host", "error", err)
+					upTunnelSpinner.Fail("Error discovering bastion host")
+
 				}
-				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-				upTunnelSpinner = logger.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+				upTunnelSpinner.Success("Discovered bastion host", config.App.Config.BastionHostID)
+
+				upTunnelSpinner.UpdateText("Activating tunnel via bastion host", "BastionHostID", config.App.Config.BastionHostID)
 
 				// TODO: suggest creating a bastion host.
 				// Use survey to ask if the user wants to create a bastion host
@@ -121,11 +116,10 @@ var upCmd = &cobra.Command{
 		} else {
 			config.App.Config.BastionHostID = bastionHost
 		}
-		logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
+		upTunnelSpinner.UpdateText("Discovered bastion host", "ID", config.App.Config.BastionHostID)
 
 		// TODO: refactor as a better functional
 		// Read atun:config from the instance as `config`
-
 		bastionHostConfig, err := tunnel.GetBastionHostConfig(config.App.Config.BastionHostID)
 		if err != nil {
 			logger.Fatal("Error getting bastion host config", "err", err)
@@ -165,63 +159,52 @@ var upCmd = &cobra.Command{
 		//	return err
 		//}
 
-		// Read private key from HOME/id_rsa.pub
-		publicKey, err := ssh.GetPublicKey(config.App.Config.SSHKeyPath)
+		// Try to connect to the bastion host and if the key is not present, upload it to it
+		err = ssh.TrySSHConnection(config.App)
 		if err != nil {
-			logger.Error("Error getting public key", "error", err)
-		}
+			upTunnelSpinner.UpdateText("Key is not present on bastion host")
 
-		logger.Debug("Public key", "key", publicKey)
+			// Read private key from HOME/id_rsa.pub
+			publicKey, err := ssh.GetPublicKey(config.App.Config.SSHKeyPath)
+			if err != nil {
+				logger.Error("Error getting public key", "error", err)
+			}
+			logger.Debug("Public key", "key", publicKey)
 
-		if showSpinner {
-			upTunnelSpinner.UpdateText("Adding local SSH Public key to the instance...")
-		} else {
-			logger.Debug("Adding local SSH Public key to the instance")
-		}
+			upTunnelSpinner.UpdateText("Ensuring local SSH key is authorized on bastion...", "SSHPublicKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID)
 
-		// TODO First try to auth with the current key and only then
-		// Send the public key to the bastion instance
-		err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
-		if err != nil {
-			if showSpinner {
-				upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance")
-			} else {
-				logger.Fatal("Error adding local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
+			// Check if key is already present on the bastion instance
+			sshKeyPresent, err := aws.CheckIfSSHPublicKeyIsPresent(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
+			if err != nil {
+				upTunnelSpinner.Fail("Failed to check if SSH public key is present on bastion host", "SSHPublicKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID, "error", err)
 				os.Exit(1)
 			}
 
+			if !sshKeyPresent {
+				upTunnelSpinner.UpdateText("SSH Key was not found on bastion. Adding it to bastion host", "SSHKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID)
+
+				// Send the public key to the bastion instance
+				err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
+				if err != nil {
+					upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
+					os.Exit(1)
+				}
+
+				upTunnelSpinner.UpdateText(fmt.Sprintf("Public key added to bastion host ~/.ssh/authorized_keys on %s", config.App.Config.BastionHostID))
+			}
+
 		}
 
-		if showSpinner {
-			upTunnelSpinner.UpdateText(fmt.Sprintf("Public key sent to bastion host %s", config.App.Config.BastionHostID))
-		} else {
-			logger.Debug("Public key sent to bastion host", "bastion", config.App.Config.BastionHostID)
-		}
+		upTunnelSpinner.UpdateText("SSH key tested and is able to be used", "BastionHostID", config.App.Config.BastionHostID)
 
 		tunnelIsUp, connections, err := tunnel.StartTunnel(config.App)
 		if err != nil {
-			if showSpinner {
-				upTunnelSpinner.Fail(fmt.Sprintf("Error starting tunnel %s", err))
-			} else {
-				logger.Fatal("Error running tunnel", "error", err)
-			}
+			upTunnelSpinner.Fail(fmt.Sprintf("Error activating tunnel %s", err))
+			os.Exit(1)
 		}
 
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
-
-		if showSpinner {
-			upTunnelSpinner.Success("Tunnel is up!")
-
-			err = tunnel.RenderTunnelStatusTable(tunnelIsUp, connections)
-			if err != nil {
-				logger.Error("Error rendering connections table", "error", err)
-			}
-			// Print pterm table with connection info
-			// Create a new table pterm.DefaultTable.WithHasHeader() with connections
-
-		} else {
-			logger.Info("Tunnel is up! Forwarded ports:", "connections", connections)
-		}
+		upTunnelSpinner.Status("Tunnel is active", tunnelIsUp, connections)
 
 		return nil
 	},
