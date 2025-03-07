@@ -122,7 +122,7 @@ func initializeAtun() {
 	// Set directory for per-env-per-profile tunnel/cdk
 	config.App.Config.TunnelDir = filepath.Join(config.App.Config.AppDir, fmt.Sprintf("%s-%s", config.App.Config.Env, config.App.Config.AWSProfile))
 
-	if !constraints.SupportsANSIEscapeCodes() {
+	if !constraints.SupportsANSIEscapeCodes() || !constraints.IsCI() {
 		// If the terminal is non-interactive or doesn't support ANSI enable plain text logging automatically (even if it's set to true)
 		logger.Debug("Terminal is non-interactive or doesn't support ANSI escape codes. Forcing plain text logging")
 		config.App.Config.LogPlainText = true
@@ -142,23 +142,3 @@ func initializeAtun() {
 	//}
 
 }
-
-////// NewAtun initializes a new Atun instance with a given configuration
-////func NewAtun(cfg *config.Config) (*Atun, error) {
-////	sess, err := session.NewSessionWithOptions(session.Options{
-////		Config:  aws.Config{Region: &cfg.AWSRegion},
-////		Profile: cfg.AWSProfile,
-////	})
-////	if err != nil {
-////		return nil, err
-////	}
-////
-////	return &Atun{
-////		Config:  cfg,
-////		Session: sess,
-////	}, nil
-//}
-
-//func init() {
-//
-//}

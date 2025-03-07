@@ -232,3 +232,14 @@ func SupportsANSIEscapeCodes() bool {
 
 	return err == nil
 }
+
+// IsCI checks if the current environment is a CI environment
+func IsCI() bool {
+	ciEnvs := []string{"CI", "GITHUB_ACTIONS", "CIRCLECI", "GITLAB_CI", "CODEBUILD_BUILD_ID"}
+	for _, env := range ciEnvs {
+		if os.Getenv(env) != "" {
+			return true
+		}
+	}
+	return false
+}
