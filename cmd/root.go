@@ -122,9 +122,11 @@ func initializeAtun() {
 	// Set directory for per-env-per-profile tunnel/cdk
 	config.App.Config.TunnelDir = filepath.Join(config.App.Config.AppDir, fmt.Sprintf("%s-%s", config.App.Config.Env, config.App.Config.AWSProfile))
 
-	if !constraints.SupportsANSIEscapeCodes() || !constraints.IsCI() {
+	if !constraints.SupportsANSIEscapeCodes() || constraints.IsCI() {
+		logger.Debug("Terminal supports ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
+		logger.Debug("Terminal is CI", "isCI", constraints.IsCI())
+
 		// If the terminal is non-interactive or doesn't support ANSI enable plain text logging automatically (even if it's set to true)
-		logger.Debug("Terminal is non-interactive or doesn't support ANSI escape codes. Forcing plain text logging")
 		config.App.Config.LogPlainText = true
 	}
 
