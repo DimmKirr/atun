@@ -714,6 +714,8 @@ func detectUsernameFromAMI(amiName string) string {
 		return "ubuntu"
 	case contains(amiName, "amzn") || contains(amiName, "amazon"):
 		return "ec2-user"
+	case contains(amiName, "al2023") || contains(amiName, "amazon"):
+		return "ec2-user"
 	case contains(amiName, "rhel") || contains(amiName, "centos"):
 		return "ec2-user"
 	case contains(amiName, "debian"):
