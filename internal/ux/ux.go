@@ -108,6 +108,6 @@ func (ps *ProgressSpinner) Status(message string, tunnelIsUp bool, connections [
 		}
 
 	} else {
-		logger.Info(fmt.Sprintln(message), "connections", connections)
+		logger.Info(fmt.Sprintln(message), "tunnelIsUp", tunnelIsUp, "connections", connections)
 	}
 }
