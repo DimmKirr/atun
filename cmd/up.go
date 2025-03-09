@@ -183,13 +183,12 @@ var upCmd = &cobra.Command{
 			upTunnelSpinner.UpdateText(fmt.Sprintf("Public key added to bastion host ~/.ssh/authorized_keys on %s", config.App.Config.BastionHostID))
 
 			// Retry starting the tunnel after the key is added
+			tunnelIsUp, connections, err = tunnel.StartTunnel(config.App)
 			if err != nil {
-				tunnelIsUp, connections, err = tunnel.StartTunnel(config.App)
-				if err != nil {
-					upTunnelSpinner.Fail(fmt.Sprintf("Error activating tunnel %s", err))
-					os.Exit(1)
-				}
+				upTunnelSpinner.Fail(fmt.Sprintf("Error activating tunnel %s", err))
+				os.Exit(1)
 			}
+
 		}
 
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
