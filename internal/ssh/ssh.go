@@ -416,8 +416,8 @@ func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 	return runningTunnels, nil
 }
 
-// TrySSHConnection tries to establish an SSH connection to the bastion host
-func TrySSHConnection(app *config.Atun) error {
+// TestSSHConnection tries to establish an SSH connection to the bastion host
+func TestSSHConnection(app *config.Atun) error {
 	bastionSockFilePath := GetBastionSockFilePath(app)
 
 	args := []string{"-S", bastionSockFilePath, "-O", "check", fmt.Sprintf("%s@%s", app.Config.BastionHostUser, app.Config.BastionHostID)}
@@ -436,11 +436,11 @@ func TrySSHConnection(app *config.Atun) error {
 	}
 
 	if strings.Contains(string(output), "Master running") {
-		logger.Debug("SSH connection established successfully")
+		logger.Debug("Test SSH connection established successfully")
 		return nil
 	}
 
-	return fmt.Errorf("failed to establish SSH connection: %s", output)
+	return fmt.Errorf("test SSH connection failed to establish: %s", output)
 }
 
 // CheckPort checks if the port is occupied and returns true/false and also process name

@@ -159,10 +159,10 @@ var upCmd = &cobra.Command{
 		//	return err
 		//}
 
-		// Try to connect to the bastion host and if the key is not present, upload it to it
-		err = ssh.TrySSHConnection(config.App)
+		// Try to start a tunnel before writing the SSH key (to save on time spent on SSM)
+		tunnelIsUp, connections, err := tunnel.StartTunnel(config.App)
 		if err != nil {
-			upTunnelSpinner.UpdateText("Key is not present on bastion host")
+			upTunnelSpinner.UpdateText("SSH key doesn't seem to be present on the bastion host")
 
 			// Read private key from HOME/id_rsa.pub
 			publicKey, err := ssh.GetPublicKey(config.App.Config.SSHKeyPath)
@@ -173,34 +173,23 @@ var upCmd = &cobra.Command{
 
 			upTunnelSpinner.UpdateText("Ensuring local SSH key is authorized on bastion...", "SSHPublicKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID)
 
-			// Check if key is already present on the bastion instance
-			sshKeyPresent, err := aws.CheckIfSSHPublicKeyIsPresent(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
+			// Send the public key to the bastion instance
+			err = aws.EnsureSSHPublicKeyPresent(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
 			if err != nil {
-				upTunnelSpinner.Fail("Failed to check if SSH public key is present on bastion host", "SSHPublicKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
 				os.Exit(1)
 			}
 
-			if !sshKeyPresent {
-				upTunnelSpinner.UpdateText("SSH Key was not found on bastion. Adding it to bastion host", "SSHKeyPath", config.App.Config.SSHKeyPath, "BastionHostID", config.App.Config.BastionHostID)
+			upTunnelSpinner.UpdateText(fmt.Sprintf("Public key added to bastion host ~/.ssh/authorized_keys on %s", config.App.Config.BastionHostID))
 
-				// Send the public key to the bastion instance
-				err = aws.SendSSHPublicKey(config.App.Config.BastionHostID, publicKey, config.App.Config.BastionHostUser)
+			// Retry starting the tunnel after the key is added
+			if err != nil {
+				tunnelIsUp, connections, err = tunnel.StartTunnel(config.App)
 				if err != nil {
-					upTunnelSpinner.Fail("Failed to add local SSH Public key to the instance", "SSHPublicKey", publicKey, "BastionHostID", config.App.Config.BastionHostID, "error", err)
+					upTunnelSpinner.Fail(fmt.Sprintf("Error activating tunnel %s", err))
 					os.Exit(1)
 				}
-
-				upTunnelSpinner.UpdateText(fmt.Sprintf("Public key added to bastion host ~/.ssh/authorized_keys on %s", config.App.Config.BastionHostID))
 			}
-
-		}
-
-		upTunnelSpinner.UpdateText("SSH key tested and is able to be used", "BastionHostID", config.App.Config.BastionHostID)
-
-		tunnelIsUp, connections, err := tunnel.StartTunnel(config.App)
-		if err != nil {
-			upTunnelSpinner.Fail(fmt.Sprintf("Error activating tunnel %s", err))
-			os.Exit(1)
 		}
 
 		// TODO: Check if Instance has forwarding working (check ipv4.forwarding sysctl)
