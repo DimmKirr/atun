@@ -157,7 +157,7 @@ func createStack(c *config.Config) {
 
 	cdktf.NewTerraformHclModule(stack, jsii.String("router"), &cdktf.TerraformHclModuleConfig{
 		// TODO: Make an abstraction atun-router module so anyone can fork and switch configs
-		Source:  jsii.String("hazelops/ec2-router/aws"),
+		Source:  jsii.String("hazelops/ec2-bastion/aws"),
 		Version: jsii.String("~>4.0"),
 
 		Variables: &terraformVariablesModules,
