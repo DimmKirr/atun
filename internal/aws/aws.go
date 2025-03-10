@@ -7,6 +7,7 @@ package aws
 
 import (
 	"fmt"
+	"os/exec"
 
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
@@ -200,7 +201,7 @@ func GetAccountId() string {
 }
 
 // GetSSMWhoAmI checks if the SSH public key is present in the instance
-func GetSSMWhoAmI(instanceID string, bastionHostUser string) (string, error) {
+func GetSSMWhoAmI(instanceID string, routerHostUser string) (string, error) {
 	command := fmt.Sprintf(
 		`bash -c 'whoami'`,
 	)
@@ -253,21 +254,21 @@ func GetSSMWhoAmI(instanceID string, bastionHostUser string) (string, error) {
 	return whoamiResponse, nil
 }
 
-func EnsureSSHPublicKeyPresent(instanceID string, publicKey string, bastionHostUser string) error {
-	// This command is executed in the bastion host and it checks if our public publicKey is present. If it's not it uploads it to the authorized_keys file.
-	// If the bastionHostUser is "root" then set bastionHostUserDirectory to /root otherwise set it to /home/bastionHostUser
-	bastionHostUserDirectory := fmt.Sprintf("/home/%s", bastionHostUser)
-	if bastionHostUser == "root" {
-		bastionHostUserDirectory = "/root"
+func EnsureSSHPublicKeyPresent(instanceID string, publicKey string, routerHostUser string) error {
+	// This command is executed in the router host and it checks if our public publicKey is present. If it's not it uploads it to the authorized_keys file.
+	// If the routerHostUser is "root" then set routerHostUserDirectory to /root otherwise set it to /home/routerHostUser
+	routerHostUserDirectory := fmt.Sprintf("/home/%s", routerHostUser)
+	if routerHostUser == "root" {
+		routerHostUserDirectory = "/root"
 	}
 
 	command := fmt.Sprintf(
 		`bash -c 'mkdir -p %s/.ssh && grep --qR "%s" %s/.ssh/authorized_keys || echo "%s" >> %s/.ssh/authorized_keys'`,
-		bastionHostUserDirectory,
+		routerHostUserDirectory,
 		strings.TrimSpace(publicKey),
-		bastionHostUserDirectory,
+		routerHostUserDirectory,
 		strings.TrimSpace(publicKey),
-		bastionHostUserDirectory,
+		routerHostUserDirectory,
 	)
 
 	logger.Debug("Sending command", "command", command)
@@ -663,4 +664,26 @@ func detectUsernameFromAMI(amiName string) string {
 // contains checks if a string contains a substring (case-insensitive).
 func contains(str, substr string) bool {
 	return strings.Contains(strings.ToLower(str), strings.ToLower(substr))
+}
+
+// ConnectToSSMConsole connects to an EC2 instance using SSM opens an interactive shell
+func ConnectToSSMConsole(instanceID string) error {
+	// TODO: refactor to use only AWS SDK
+
+	sessionCommand := exec.Command(
+		"aws", "ssm", "start-session",
+		"--target", instanceID,
+		"--document-name", "AWS-StartInteractiveCommand",
+		"--parameters", "command=/bin/bash",
+	)
+
+	sessionCommand.Stdout = os.Stdout
+	sessionCommand.Stderr = os.Stderr
+	sessionCommand.Stdin = os.Stdin
+
+	if err := sessionCommand.Run(); err != nil {
+		return fmt.Errorf("failed to start SSM session: %w", err)
+	}
+
+	return nil
 }

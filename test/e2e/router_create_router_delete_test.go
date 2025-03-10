@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -102,7 +103,15 @@ func (s *testSetup) cleanupTestEnvironment(t *testing.T) {
 
 // runAtunCommand is a helper function to run Atun commands with consistent environment setup
 func runAtunCommand(t *testing.T, workDir, command string, interactive bool, envVars map[string]string) {
-	cmd := exec.Command("atun", command)
+
+	// get path to the directory where the test is running
+	_, filename, _, _ := runtime.Caller(0)
+	// Get bin dir
+	binDir := filepath.Join(filepath.Dir(filename), "..", "..", "bin")
+
+	t.Log("binDir: ", binDir)
+
+	cmd := exec.Command(path.Join(binDir, "atun"), strings.Fields(command)...)
 	cmd.Dir = workDir
 
 	// Set up environment variables
@@ -116,6 +125,7 @@ func runAtunCommand(t *testing.T, workDir, command string, interactive bool, env
 
 	// Set up command environment
 	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("PATH=./bin/:%s", os.Getenv("PATH")),
 		fmt.Sprintf("AWS_PROFILE=%s", os.Getenv("AWS_PROFILE")),
 		fmt.Sprintf("AWS_CONFIG_FILE=%s", os.Getenv("AWS_CONFIG_FILE")),
 		fmt.Sprintf("AWS_SHARED_CREDENTIALS_FILE=%s", os.Getenv("AWS_SHARED_CREDENTIALS_FILE")),
@@ -138,8 +148,8 @@ func runAtunCommand(t *testing.T, workDir, command string, interactive bool, env
 	}
 }
 
-// TestAtunCreateDelete tests the create/delete flow in both interactive and non-interactive modes
-func TestAtunCreateDelete(t *testing.T) {
+// TestAtunRouterCreateRouterDelete tests the create/delete flow in both interactive and non-interactive modes
+func TestAtunRouterCreateRouterDelete(t *testing.T) {
 	tests := []struct {
 		name           string
 		interactive    bool
@@ -149,7 +159,7 @@ func TestAtunCreateDelete(t *testing.T) {
 		{
 			name:           "Interactive terminal",
 			interactive:    true,
-			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			expectedOutput: "Creating Ad-Hoc EC2 Router Instance...",
 			envVars: map[string]string{
 				"TERM":                "xterm-256color",
 				"NO_COLOR":            "",
@@ -161,7 +171,7 @@ func TestAtunCreateDelete(t *testing.T) {
 		{
 			name:           "Non-interactive terminal",
 			interactive:    false,
-			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			expectedOutput: "Creating Ad-Hoc EC2 Router Instance...",
 			envVars: map[string]string{
 				"TERM":           "",
 				"NO_COLOR":       "1",
@@ -179,14 +189,14 @@ func TestAtunCreateDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run create command
-			runAtunCommand(t, setup.workDir, "create", tt.interactive, tt.envVars)
+			runAtunCommand(t, setup.workDir, "router create", tt.interactive, tt.envVars)
 
 			// Verify EC2 Instance Exists
 			instanceID := verifyEC2Instance(t, setup.ec2Client, "atun.io/version", "1")
 			t.Logf("EC2 instance created successfully with ID: %s", instanceID)
 
 			// Run delete command
-			runAtunCommand(t, setup.workDir, "delete", tt.interactive, tt.envVars)
+			runAtunCommand(t, setup.workDir, "router delete", tt.interactive, tt.envVars)
 
 			// Verify EC2 Instance Removed
 			verifyInstanceDeleted(t, setup.ec2Client, instanceID)
@@ -348,8 +358,8 @@ func prepareWorkDir(t *testing.T, subnetID string, amiID string) string {
 	tmpDir, _ := os.MkdirTemp("", "atun")
 	content := fmt.Sprintf(`
 aws_profile = "localstack"
-bastion_subnet_id = "%s"
-bastion_host_ami = "%s"
+router_subnet_id = "%s"
+router_host_ami = "%s"
 [[hosts]]
 name = "ipconfig.io"
 proto = "ssm"

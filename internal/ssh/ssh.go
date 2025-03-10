@@ -92,14 +92,14 @@ ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartS
 }
 
 func GetSSMPluginStatus(app *config.Atun) (bool, error) {
-	// Check if `session-manager-plugin' is started and process contains Bastion instance ID
+	// Check if `session-manager-plugin' is started and process contains Router instance ID
 	cmd := exec.Command("ps", "aux")
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to check SSM plugin status: %w", err)
 	}
 
-	if !strings.Contains(string(output), app.Config.BastionHostID) {
+	if !strings.Contains(string(output), app.Config.RouterHostID) {
 		return false, nil
 	}
 
@@ -109,14 +109,14 @@ func GetSSMPluginStatus(app *config.Atun) (bool, error) {
 func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 	// TODO: Add port check too to make sure to see outrun tunnels
 
-	bastionSockFilePath := GetBastionSockFilePath(app)
+	routerSockFilePath := GetRouterSockFilePath(app)
 
-	// If a bastion socket file exists, check the tunnel status
-	if _, err := os.Stat(bastionSockFilePath); !os.IsNotExist(err) {
-		logger.Debug("An existing tunnel socket found", "path", bastionSockFilePath)
+	// If a router socket file exists, check the tunnel status
+	if _, err := os.Stat(routerSockFilePath); !os.IsNotExist(err) {
+		logger.Debug("An existing tunnel socket found", "path", routerSockFilePath)
 
 		// Pass "check" command to see if the socket has a valid SSH connection
-		args := []string{"ssh", "-S", bastionSockFilePath, "-O", "check", ""}
+		args := []string{"ssh", "-S", routerSockFilePath, "-O", "check", ""}
 
 		// Run the SSH command in a blocking way
 		cmd := exec.Command("ssh", args...)
@@ -169,16 +169,16 @@ func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 
 	}
 
-	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", bastionSockFilePath)
+	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", routerSockFilePath)
 	return false, nil, nil
 }
 
 func StartSSHTunnel(app *config.Atun) error {
-	bastionSockFilePath := GetBastionSockFilePath(app)
+	routerSockFilePath := GetRouterSockFilePath(app)
 
 	args := []string{}
 
-	// Check if the bastion socket file exists
+	// Check if the router socket file exists
 
 	tunnelStatus, _, err := GetSSHTunnelStatus(app)
 	if err != nil {
@@ -186,8 +186,8 @@ func StartSSHTunnel(app *config.Atun) error {
 	}
 
 	if !tunnelStatus {
-		logger.Debug("Tunnel socket not found. Creating a new one", "path", bastionSockFilePath)
-		args = []string{"-M", "-t", "-S", bastionSockFilePath, "-fN"}
+		logger.Debug("Tunnel socket not found. Creating a new one", "path", routerSockFilePath)
+		args = []string{"-M", "-t", "-S", routerSockFilePath, "-fN"}
 
 		// Disable strict host key checking
 		if !app.Config.SSHStrictHostKeyChecking {
@@ -195,7 +195,7 @@ func StartSSHTunnel(app *config.Atun) error {
 		}
 
 		// TODO: Add ability to support other instance types, not just AWS Linux
-		args = append(args, fmt.Sprintf("%s@%s", app.Config.BastionHostUser, app.Config.BastionHostID))
+		args = append(args, fmt.Sprintf("%s@%s", app.Config.RouterHostUser, app.Config.RouterHostID))
 		args = append(args, "-F", app.Config.SSHConfigFile)
 
 		if _, err := os.Stat(app.Config.SSHKeyPath); !os.IsNotExist(err) {
@@ -275,14 +275,14 @@ func StartSSHTunnel(app *config.Atun) error {
 
 // StopSSHTunnel stops the SSH tunnel and returns false if the tunnel is not running
 func StopSSHTunnel(app *config.Atun) (bool, error) {
-	bastionSockFilePath := GetBastionSockFilePath(app)
+	routerSockFilePath := GetRouterSockFilePath(app)
 	tunnelConfigFilePath := GetSSHConfigFilePath(app)
 
-	// If a bastion socket file exists, check the tunnel status
-	if _, err := os.Stat(bastionSockFilePath); !os.IsNotExist(err) {
-		logger.Debug("A tunnel socket from has been found", "path", bastionSockFilePath)
+	// If a router socket file exists, check the tunnel status
+	if _, err := os.Stat(routerSockFilePath); !os.IsNotExist(err) {
+		logger.Debug("A tunnel socket from has been found", "path", routerSockFilePath)
 
-		args := []string{"ssh", "-S", bastionSockFilePath, "-O", "exit", ""}
+		args := []string{"ssh", "-S", routerSockFilePath, "-O", "exit", ""}
 
 		// Run the SSH command in a blocking way
 		cmd := exec.Command("ssh", args...)
@@ -298,12 +298,12 @@ func StopSSHTunnel(app *config.Atun) (bool, error) {
 		}
 	}
 
-	// Check if the bastion socket file exists and remove it if it does
+	// Check if the router socket file exists and remove it if it does
 	if _, err := os.Stat(tunnelConfigFilePath); err == nil {
 		if err := os.Remove(tunnelConfigFilePath); err != nil {
-			return false, fmt.Errorf("failed to remove bastion config file: %w", err)
+			return false, fmt.Errorf("failed to remove router config file: %w", err)
 		}
-		logger.Debug("Removed bastion config file", "path", tunnelConfigFilePath)
+		logger.Debug("Removed router config file", "path", tunnelConfigFilePath)
 	}
 
 	tunnelActive, _, err := GetSSHTunnelStatus(app)
@@ -319,26 +319,26 @@ func StopSSHTunnel(app *config.Atun) (bool, error) {
 	return true, nil
 }
 
-func GetBastionSockFilePath(app *config.Atun) string {
-	logger.Debug("Getting bastion socket file path", "tunnelDir", app.Config.TunnelDir, "env", app.Config.Env, "bastionHostID", app.Config.BastionHostID)
+func GetRouterSockFilePath(app *config.Atun) string {
+	logger.Debug("Getting router socket file path", "tunnelDir", app.Config.TunnelDir, "env", app.Config.Env, "routerHostID", app.Config.RouterHostID)
 
-	if app.Config.BastionHostID == "" {
-		logger.Debug("Can't find Bastion Host ID is not set. Assuming bastion id from existing socket file")
+	if app.Config.RouterHostID == "" {
+		logger.Debug("Can't find Router Host ID is not set. Assuming router id from existing socket file")
 
 	}
 
-	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-tunnel.sock", app.Config.BastionHostID))
+	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-tunnel.sock", app.Config.RouterHostID))
 }
 
 func GetSSHConfigFilePath(app *config.Atun) string {
-	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-ssh.config", app.Config.BastionHostID))
+	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-ssh.config", app.Config.RouterHostID))
 }
 
 func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 	var runningTunnels []config.Config
 	///  ssh -M -t -S /Users/dmitry/.atun/adhoc-nutcorp-dev/i-059cde3acc2a0c8eb-tunnel.sock -fN -o StrictHostKeyChecking=no ec2-user@i-059cde3acc2a0c8eb -F /var/folders/g1/g6vwr5j95c76bc5tnq0ky2t40000gn/T/atun-ssh.config647105965 -i /Users/dmitry/.ssh/id_rsa
 
-	// Define the regex bastionInstancePattern
+	// Define the regex routerInstancePattern
 
 	// This regex is based on the cmd and args in ssh package
 	sshProcessPattern := regexp.MustCompile(`.*-S\s+(?P<sshSocketFile>\S+).*\s+(?P<userName>[a-zA-Z_][a-zA-Z0-9._-]{0,31})@(?P<instanceId>i-[0-9a-f]{17}).*-F\s+(?P<sshConfigFile>\S+).*-i\s+(?P<sshKeyPath>\S+).*`)
@@ -405,10 +405,10 @@ func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 				}
 
 				runningTunnels = append(runningTunnels, config.Config{
-					SSHConfigFile:   matchedSSHConfigFile,
-					SSHSocketFile:   matchedSSHSocketFile,
-					BastionHostID:   matchedInstanceID,
-					BastionHostUser: matchedUserName,
+					SSHConfigFile:  matchedSSHConfigFile,
+					SSHSocketFile:  matchedSSHSocketFile,
+					RouterHostID:   matchedInstanceID,
+					RouterHostUser: matchedUserName,
 				})
 			}
 		}
@@ -416,11 +416,11 @@ func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 	return runningTunnels, nil
 }
 
-// TestSSHConnection tries to establish an SSH connection to the bastion host
+// TestSSHConnection tries to establish an SSH connection to the router host
 func TestSSHConnection(app *config.Atun) error {
-	bastionSockFilePath := GetBastionSockFilePath(app)
+	routerSockFilePath := GetRouterSockFilePath(app)
 
-	args := []string{"-S", bastionSockFilePath, "-O", "check", fmt.Sprintf("%s@%s", app.Config.BastionHostUser, app.Config.BastionHostID)}
+	args := []string{"-S", routerSockFilePath, "-O", "check", fmt.Sprintf("%s@%s", app.Config.RouterHostUser, app.Config.RouterHostID)}
 
 	cmd := exec.Command("ssh", args...)
 	cmd.Dir = app.Config.AppDir
@@ -509,8 +509,8 @@ func getProcessNameByPID(pid int) (string, error) {
 	return name, nil
 }
 
-// getBastionHostIDFromSocket gets the bastion host ID from the bastion socket file
-func GetBastionHostIDFromExistingSession(tunnelDir string) (string, error) {
+// getRouterHostIDFromSocket gets the router host ID from the router socket file
+func GetRouterHostIDFromExistingSession(tunnelDir string) (string, error) {
 	files, err := os.ReadDir(tunnelDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read tunnel directory: %w", err)
@@ -527,15 +527,15 @@ func GetBastionHostIDFromExistingSession(tunnelDir string) (string, error) {
 	logger.Debug("Tunnel socket files", "files", tunnelFiles)
 
 	if len(tunnelFiles) > 1 {
-		return "", fmt.Errorf("multiple bastion host IDs found in the tunnel directory %s. Likely due to abnormal termination before. Please clean up manually", tunnelDir)
+		return "", fmt.Errorf("multiple router host IDs found in the tunnel directory %s. Likely due to abnormal termination before. Please clean up manually", tunnelDir)
 	}
 
 	if len(tunnelFiles) == 1 {
-		bastionHostID := strings.TrimSuffix(tunnelFiles[0], "-tunnel.sock")
-		return bastionHostID, nil
+		routerHostID := strings.TrimSuffix(tunnelFiles[0], "-tunnel.sock")
+		return routerHostID, nil
 	}
 
 	// TODO: attempt to get it from ssm processes
 
-	return "", fmt.Errorf("no bastion host ID found in the tunnel directory")
+	return "", fmt.Errorf("no router host ID found in the tunnel directory")
 }

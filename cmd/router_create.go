@@ -23,10 +23,10 @@ import (
 )
 
 // createCmd represents the add command
-var createCmd = &cobra.Command{
+var routerCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Creates an ad-hoc bastion host to a specified subnet",
-	Long: `Creates ad-hoc bastion host to a specified subnet. Performed via CDKTF/Terraform 
+	Short: "Creates an ad-hoc router host to a specified subnet",
+	Long: `Creates ad-hoc router host to a specified subnet. Performed via CDKTF/Terraform 
 	This is useful when there is no IaC in place and there is a need to connect to a resource private.
 	State is saved locally and it's advised to delete it after the task is finished.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -88,8 +88,8 @@ var createCmd = &cobra.Command{
 
 		// TODO: Abstract this into a separate function since it's used in multiple places
 		// Get VPC ID from Subnet ID if it's not populated
-		if config.App.Config.BastionVPCID == "" {
-			if config.App.Config.BastionSubnetID == "" {
+		if config.App.Config.RouterVPCID == "" {
+			if config.App.Config.RouterSubnetID == "" {
 				logger.Info("No Subnet ID provided. Asking for it.")
 				// Get list of subnets in the account (via GetSubnetsWithSSM) and ask the user to pick one with survey
 				subnets, err := aws.GetSubnetsWithSSM()
@@ -99,7 +99,7 @@ var createCmd = &cobra.Command{
 
 				// Ask user to pick a subnet
 				err = survey.AskOne(&survey.Select{
-					Message: "Bastion Instance will be deployed.\nSelect Subnet ID:",
+					Message: "Router Instance will be deployed.\nSelect Subnet ID:",
 					Options: func() []string {
 						var options []string
 						for _, subnet := range subnets {
@@ -118,91 +118,72 @@ var createCmd = &cobra.Command{
 						}
 						return fmt.Sprintf("SSM: OK, CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
 					},
-				}, &config.App.Config.BastionSubnetID, survey.WithValidator(survey.Required))
+				}, &config.App.Config.RouterSubnetID, survey.WithValidator(survey.Required))
 			}
 
-			logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", config.App.Config.BastionSubnetID)
-			config.App.Config.BastionVPCID, err = aws.GetVPCIDFromSubnet(config.App.Config.BastionSubnetID)
+			logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", config.App.Config.RouterSubnetID)
+			config.App.Config.RouterVPCID, err = aws.GetVPCIDFromSubnet(config.App.Config.RouterSubnetID)
 			if err != nil {
 				logger.Fatal("Error getting VPC ID from Subnet ID", "err", err)
 			}
 		}
-		logger.Debug("Obtained VPC ID from the Subnet ID", "BastionVPCID", config.App.Config.BastionVPCID)
+		logger.Debug("Obtained VPC ID from the Subnet ID", "RouterVPCID", config.App.Config.RouterVPCID)
 
 		// Create and start a fork of the default spinner.
-		var createBastionInstanceSpinner *pterm.SpinnerPrinter
+		var createRouterInstanceSpinner *pterm.SpinnerPrinter
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
 		if showSpinner {
-			createBastionInstanceSpinner = ux.StartCustomSpinner("Creating Ad-Hoc EC2 Bastion Instance...")
+			createRouterInstanceSpinner = ux.StartCustomSpinner("Creating Ad-Hoc EC2 Router Instance...")
 		} else {
 			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
-			logger.Info("Creating Ad-Hoc EC2 Bastion Instance...")
+			logger.Info("Creating Ad-Hoc EC2 Router Instance...")
 		}
 		// Apply the configuration using CDKTF
 		err = infra.ApplyCDKTF(config.App.Config)
 		if err != nil {
-			createBastionInstanceSpinner.Fail("Error running CDKTF", err)
+			createRouterInstanceSpinner.Fail("Error running CDKTF", err)
 			logger.Error("Error running CDKTF", "err", err)
 			return err
 		}
 
 		if showSpinner {
-			createBastionInstanceSpinner.UpdateText("CDKTF stack applied successfully")
+			createRouterInstanceSpinner.UpdateText("CDKTF stack applied successfully")
 		} else {
 			logger.Info("CDKTF stack applied successfully")
 		}
 
-		// Get BastionHostID
-		config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+		// Get RouterHostID
+		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
-			logger.Fatal("Error discovering bastion host", "error", err)
+			logger.Fatal("Error discovering router host", "error", err)
 		}
 
 		if showSpinner {
-			createBastionInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.BastionHostID))
+			createRouterInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.RouterHostID))
 		} else {
-			logger.Debug("Waiting for the instance to be running...", "bastionHostID", config.App.Config.BastionHostID)
+			logger.Debug("Waiting for the instance to be running...", "routerHostID", config.App.Config.RouterHostID)
 		}
 
 		// Wait until the instance is ready to accept SSM connections
-		err = aws.WaitForInstanceReady(config.App.Config.BastionHostID)
+		err = aws.WaitForInstanceReady(config.App.Config.RouterHostID)
 		if err != nil {
 			if showSpinner {
-				createBastionInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
+				createRouterInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
 			} else {
-				logger.Fatal("Error waiting for instance to be ready", "BastionHostID", config.App.Config.BastionHostID, "error", err)
+				logger.Fatal("Error waiting for instance to be ready", "RouterHostID", config.App.Config.RouterHostID, "error", err)
 				os.Exit(1)
 			}
 		}
 
 		if showSpinner {
-			createBastionInstanceSpinner.Success(fmt.Sprintf("Bastion Host %s is ready. Run `atun up`.", config.App.Config.BastionHostID))
+			createRouterInstanceSpinner.Success(fmt.Sprintf("Router Host %s is ready. Run `atun up`.", config.App.Config.RouterHostID))
 		} else {
-			logger.Debug("Instance is ready", "bastionHostID", config.App.Config.BastionHostID)
+			logger.Debug("Instance is ready", "routerHostID", config.App.Config.RouterHostID)
 		}
 
 		return nil
 	},
-}
-
-func init() {
-	logger.Debug("Init create command")
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Add flags for VPC and Subnet
-	createCmd.PersistentFlags().String("bastion-vpc-id", "", "VPC ID of the bastion host to be created")
-	createCmd.PersistentFlags().String("bastion-subnet-id", "", "Subnet ID of the bastion host to be created")
-	createCmd.PersistentFlags().String("aws-key-pair", "", "AWS Key Pair Name to use for the bastion host")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	logger.Debug("Init add command done")
 }
 
 func buildHostConfig(app *config.Atun) error {
@@ -254,7 +235,7 @@ func buildHostConfig(app *config.Atun) error {
 			}
 			return fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
 		},
-	}, &app.Config.BastionSubnetID, survey.WithValidator(survey.Required))
+	}, &app.Config.RouterSubnetID, survey.WithValidator(survey.Required))
 	if err != nil {
 		log.Fatalf("Error getting Subnet ID: %v", err)
 		return err
@@ -287,14 +268,14 @@ func buildHostConfig(app *config.Atun) error {
 	}
 
 	// Get VPC ID from Subnet ID if it's not populated
-	if app.Config.BastionVPCID != "" {
-		logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", app.Config.BastionSubnetID)
-		app.Config.BastionVPCID, err = aws.GetVPCIDFromSubnet(app.Config.BastionSubnetID)
+	if app.Config.RouterVPCID != "" {
+		logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", app.Config.RouterSubnetID)
+		app.Config.RouterVPCID, err = aws.GetVPCIDFromSubnet(app.Config.RouterSubnetID)
 		if err != nil {
 			logger.Fatal("Error getting VPC ID from Subnet ID", "err", err)
 		}
 	}
-	logger.Debug("VPC ID", "VPC ID", app.Config.BastionVPCID)
+	logger.Debug("VPC ID", "VPC ID", app.Config.RouterVPCID)
 
 	appHosts := app.Config.Hosts
 
@@ -445,4 +426,11 @@ func buildHostConfig(app *config.Atun) error {
 	}
 
 	return nil
+}
+
+func init() {
+	// Add flags for VPC and Subnet
+	routerCreateCmd.PersistentFlags().String("router-vpc-id", "", "VPC ID of the router host to be created")
+	routerCreateCmd.PersistentFlags().String("router-subnet-id", "", "Subnet ID of the router host to be created")
+	routerCreateCmd.PersistentFlags().String("aws-key-pair", "", "AWS Key Pair Name to use for the router host")
 }

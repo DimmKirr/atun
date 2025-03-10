@@ -21,25 +21,30 @@ import (
 	"strings"
 )
 
-// GetBastionHostIDFromTags retrieves the Bastion Host ID from AWS tags.
-// It takes a session, tag name, and tag value as parameters and returns the instance ID of the Bastion Host.
-func GetBastionHostIDFromTags() (string, error) {
-	// First try to find bastion host id from the running process
+// GetRouterHostIDFromTags retrieves the Router Host ID from AWS tags.
+// It takes a session, tag name, and tag value as parameters and returns the instance ID of the Router Host.
+func GetRouterHostIDFromTags() (string, error) {
+	// First try to find router host id from the running process
 	runningTunnels, err := ssh.GetRunningTunnels(config.App)
+	if err != nil {
+		logger.Debug("Error getting running tunnels", "error", err)
+		return "", err
+	}
+
 	logger.Debug("Running tunnels", "tunnels", runningTunnels)
 
 	if len(runningTunnels) > 0 {
-		// Get the bastion host ID from the running tunnels
+		// Get the router host ID from the running tunnels
 		for _, tunnel := range runningTunnels {
-			// Get the bastion host ID from the running tunnel
-			bastionHostID := tunnel.BastionHostID
-			if bastionHostID != "" {
-				return bastionHostID, nil
+			// Get the router host ID from the running tunnel
+			routerHostID := tunnel.RouterHostID
+			if routerHostID != "" {
+				return routerHostID, nil
 			}
 		}
 	}
 
-	logger.Debug("Getting bastion host ID. Looking for atun routers.")
+	logger.Debug("Getting router host ID. Looking for atun routers.")
 
 	// Build a map of tags to filter instances
 	tags := map[string]string{
@@ -73,17 +78,17 @@ func GetBastionHostIDFromTags() (string, error) {
 	return "", err
 }
 
-// GetBastionHostConfig Gets bastion host tags and unmarshalls it into a struct
-func GetBastionHostConfig(bastionHostID string) (config.Atun, error) {
+// GetRouterHostConfig Gets router host tags and unmarshalls it into a struct
+func GetRouterHostConfig(routerHostID string) (config.Atun, error) {
 	// TODO:Implement logic:
-	// - Get all tags from the host bastionHostID
+	// - Get all tags from the host routerHostID
 	// - filter those that have atun.io
 	// - unmarshal the tags into a struct
 
 	// Use AWS SDK to get instance tags
-	tags, err := aws.GetInstanceTags(bastionHostID)
+	tags, err := aws.GetInstanceTags(routerHostID)
 	if err != nil {
-		logger.Error("Error getting instance tags", "instance_id", bastionHostID, "error", err)
+		logger.Error("Error getting instance tags", "instance_id", routerHostID, "error", err)
 		return config.Atun{}, err // Return the error early
 	}
 
@@ -93,13 +98,13 @@ func GetBastionHostConfig(bastionHostID string) (config.Atun, error) {
 		Config: &config.Config{}, // Ensure nested structs are initialized
 	}
 
-	sshUser, err := aws.GetInstanceUsername(bastionHostID)
+	sshUser, err := aws.GetInstanceUsername(routerHostID)
 	if err != nil {
-		logger.Error("Error getting instance username", "instance_id", bastionHostID, "error", err)
+		logger.Error("Error getting instance username", "instance_id", routerHostID, "error", err)
 		return config.Atun{}, err
 	}
 
-	atun.Config.BastionHostUser = sshUser
+	atun.Config.RouterHostUser = sshUser
 
 	for k, v := range tags {
 		// Iterate over the tags and use only atun.io tags
@@ -169,7 +174,7 @@ func SetAWSCredentials(sess *session.Session) error {
 }
 
 func StartTunnel(app *config.Atun) (bool, [][]string, error) {
-	logger.Debug("Starting tunnel", "bastion", app.Config.BastionHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
+	logger.Debug("Starting tunnel", "router", app.Config.RouterHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
 
 	if err := SetAWSCredentials(app.Session); err != nil {
 		return false, nil, fmt.Errorf("can't start tunnel: %w", err)
@@ -190,7 +195,7 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 		}
 
 		if ssmPluginIsRunning {
-			return tunnelIsUp, nil, fmt.Errorf("Tunnel is down but SSM plugin is already running with bastion host %s", app.Config.BastionHostID)
+			return tunnelIsUp, nil, fmt.Errorf("Tunnel is down but SSM plugin is already running with router host %s", app.Config.RouterHostID)
 		}
 
 		// Start SSH Tunnel
@@ -311,7 +316,7 @@ func CalculateLocalPort(remotePort int) (int, error) {
 //				return fmt.Errorf("can't find process: %w", err)
 //			}
 //
-//			_, err = os.Stat(filepath.Join(dir, "bastion.sock"))
+//			_, err = os.Stat(filepath.Join(dir, "router.sock"))
 //			if processName == "ssh" && os.IsNotExist(err) {
 //				return fmt.Errorf("it could be another ize tunnel, but we can't find a socket. Something went wrong. We suggest terminating it and starting it up again")
 //			}

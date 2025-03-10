@@ -25,13 +25,13 @@ var downCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger.Debug("Down command called")
 		var (
-			err           error
-			bastionHostID string
+			err          error
+			routerHostID string
 		)
 
 		// Check Constraints
 		//if err := constraints.CheckConstraints(
-		//	constraints.WithBastionHostID(),
+		//	constraints.WithRouterHostID(),
 		//); err != nil {
 		//	return err
 		//}
@@ -46,22 +46,22 @@ var downCmd = &cobra.Command{
 
 		downTunnelSpinner := ux.NewProgressSpinner("Stopping SSM tunnel")
 
-		bastionHostID = cmd.Flag("bastion").Value.String()
+		routerHostID = cmd.Flag("router").Value.String()
 
-		// If bastion ID is not provided via a flag
-		if bastionHostID == "" {
-			bastionHostID, err = ssh.GetBastionHostIDFromExistingSession(config.App.Config.TunnelDir)
+		// If router ID is not provided via a flag
+		if routerHostID == "" {
+			routerHostID, err = ssh.GetRouterHostIDFromExistingSession(config.App.Config.TunnelDir)
 			if err != nil {
-				downTunnelSpinner.UpdateText("Couldn't get bastion host ID locally. Trying with AWS", "error", err)
+				downTunnelSpinner.UpdateText("Couldn't get router host ID locally. Trying with AWS", "error", err)
 			}
 
 			downTunnelSpinner.UpdateText("Authenticating with AWS")
 
 			aws.InitAWSClients(config.App)
 
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+			config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 			if err != nil {
-				downTunnelSpinner.Fail("No Bastion hosts found with atun.io tags and no bastion host provided", "error", err)
+				downTunnelSpinner.Fail("No Router hosts found with atun.io tags and no router host provided", "error", err)
 			}
 		}
 
@@ -71,7 +71,7 @@ var downCmd = &cobra.Command{
 		}
 
 		if tunnelActive {
-			downTunnelSpinner.UpdateText("Tunnel is active", "tunnelActive", tunnelActive, "bastionHostID", config.App.Config.BastionHostID)
+			downTunnelSpinner.UpdateText("Tunnel is active", "tunnelActive", tunnelActive, "routerHostID", config.App.Config.RouterHostID)
 
 			downTunnelSpinner.UpdateText("Deactivating tunnel")
 			tunnelActive, err = ssh.StopSSHTunnel(config.App)
@@ -87,13 +87,13 @@ var downCmd = &cobra.Command{
 
 		// Get delete flag
 
-		deleteBastion, _ := cmd.Flags().GetBool("delete")
+		deleteRouter, _ := cmd.Flags().GetBool("delete")
 
-		if deleteBastion {
-			downTunnelSpinner.UpdateText("Delete flag is set. Deleting bastion host", "bastionHostID", config.App.Config.BastionHostID)
+		if deleteRouter {
+			downTunnelSpinner.UpdateText("Delete flag is set. Deleting router host", "routerHostID", config.App.Config.RouterHostID)
 
 			// Run create command from here
-			err := deleteCmd.RunE(deleteCmd, args)
+			err := routerDeleteCmd.RunE(routerDeleteCmd, args)
 			if err != nil {
 				return fmt.Errorf("error running deleteCmd: %w", err)
 			}
@@ -105,6 +105,6 @@ var downCmd = &cobra.Command{
 
 func init() {
 	logger.Debug("Initializing up command")
-	downCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
-	downCmd.PersistentFlags().BoolP("delete", "d", false, "Delete ad-hoc bastion (if exists). Won't delete any resources non-managed by atun")
+	downCmd.PersistentFlags().StringP("router", "b", "", "Router instance id to use. If not specified the first running instance with the atun.io tags is used")
+	downCmd.PersistentFlags().BoolP("delete", "d", false, "Delete ad-hoc router (if exists). Won't delete any resources non-managed by atun")
 }

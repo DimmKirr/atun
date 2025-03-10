@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: © 2024 Dmitry Kireev
  */
+
 package cmd
 
 import (
@@ -15,8 +16,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// deleteCmd represents the del command
-var deleteCmd = &cobra.Command{
+// routerDeleteCmd represents the del command
+var routerDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Deletes an ad-hoc router host",
 	Long:  `Deletes an ad-hoc router host created by atun. Performed via CDKTF/Terraform: doesn't affect other resources`,
@@ -59,5 +60,4 @@ var deleteCmd = &cobra.Command{
 }
 
 func init() {
-	logger.Debug("Init delete command")
 }
