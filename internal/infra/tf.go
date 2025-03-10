@@ -95,6 +95,7 @@ func InstallTerraform(version string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get latest version: %w", err)
 		}
+		logger.Debug("Latest Terraform", "version", version)
 	}
 
 	// Determine the correct download URL based on OS and architecture

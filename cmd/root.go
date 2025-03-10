@@ -7,12 +7,13 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
-	"path/filepath"
 
 	//"github.com/automationd/atun/internal/config"
 	"os"
@@ -69,12 +70,11 @@ func init() {
 
 	// TODO: Use Method Receiver (pass atun all the way to the command)
 	rootCmd.AddCommand(
-		deleteCmd,
-		createCmd,
 		upCmd,
 		downCmd,
 		statusCmd,
 		versionCmd,
+		routerCmd,
 	)
 
 	//cobra.OnInitialize(config.LoadConfig)

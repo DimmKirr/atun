@@ -25,7 +25,7 @@ _(This is a MOCK Demo. Will update it soon)_
 
 ## Features
 
-This tool allows to connect to private resources (RDS, Redis, etc) via EC2 bastion hosts without public IP (via SSM).
+This tool allows to connect to private resources (RDS, Redis, etc) via EC2 router hosts without public IP (via SSM).
 At the moment there are only three commands available: `up`, `down`, and `status`.
 
 ## Tag Metadata Schema
@@ -44,29 +44,47 @@ At the moment it has two types of tags: Atun Version and Atun Host.
 
 - local: port that would be bound on a local machine (your computer)
 - proto: protocol of forwarding (only `ssm` for now, but might be `k8s` or `cloudflare`)
-- remote: port that is available on the internal network to the bastion host.
+- remote: port that is available on the internal network to the router host.
 
 ### Example
 
 | AWS Tag                                                                        | Value                                           | Description                                                               |
 |--------------------------------------------------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------|
 | `atun.io/version`                                                              | `1`                                             | Schema Version. It might change if significant changes would be intoduced |
-| `atun.io/env`                                                                  | `dev`                                           | Specified environment of the bastion host                                 |
+| `atun.io/env`                                                                  | `dev`                                           | Specified environment of the router host                                 |
 | `atun.io/host/nutcorp-api.cluster-xxxxxxxxxxxxxxx.us-east-1.rds.amazonaws.com` | `{"local":"23306","proto":"ssm","remote":3306}` | Describes host config and how to forward ports for a MySQL RDS            |
 | `atun.io/host/nutcorp.xxxxxx.0001.use0.cache.amazonaws.com`                    | `{"local":"26379","proto":"ssm","remote":6379}` | Describes host config and how to forward ports for ElastiCache Redis      |
 
 ## Usage
-There are two ways to use this tool: when an infra has a bastion with `atun.io` schema tags and when it doesn't have it yet.
+There are two ways to use this tool: when an infra has a router with `atun.io` schema tags and when it doesn't have it yet.
 
-### Create a Bastion Host
-When an infra doesn't have a bastion host yet (let's say this is an adhoc connection), it's possible to create a bastion host with this tool.
+### Manage Router Endpoints
+Atun uses "routers" (such as EC2 routers) to establish secure connections to your infrastructure.
 
+#### Create a Router
 ```shell
-atun create
+atun router create
+```
+
+#### List Available Routers
+```shell
+atun router ls
+```
+
+#### Connect to a Router
+For troubleshooting or direct access:
+```shell
+atun router shell
+```
+A relevant protocol will be used, such as SSM.
+
+#### Delete a Router
+```shell
+atun router delete
 ```
 
 ### Bring up a tunnel
-This will bring an tunnel via existing atun.io bastion
+This will bring up a tunnel via existing atun.io router
 ```shell
 atun up
 ```
@@ -81,12 +99,12 @@ atun down
 atun status
 ```
 
-### Create a bastion host and connect in one go
+### Create a router and connect in one go
 ```shell
 atun up --create
 ```
 
-### Bring down a tunnel and delete ad-hoc bastion host
+### Bring down a tunnel and delete ad-hoc router
 ```shell
 atun down --delete
 ```

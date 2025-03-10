@@ -29,7 +29,7 @@ var statusCmd = &cobra.Command{
 	Long: `Show status of the tunnel and current environment.
 	This is also useful for troubleshooting`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var bastionHost string
+		var routerHost string
 
 		logger.Debug("Status command called")
 		cwd, err := os.Getwd()
@@ -40,48 +40,48 @@ var statusCmd = &cobra.Command{
 		dt := pterm.DefaultTable
 
 		aws.InitAWSClients(config.App)
-		// Get the bastion host ID from the command line
-		bastionHost = cmd.Flag("bastion").Value.String()
+		// Get the router host ID from the command line
+		routerHost = cmd.Flag("router").Value.String()
 
 		var upTunnelSpinner *pterm.SpinnerPrinter
 		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
 
-		// If bastion host is not provided, get the first running instance based on the discovery tag (atun.io/version)
-		if bastionHost == "" {
-			config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+		// If router host is not provided, get the first running instance based on the discovery tag (atun.io/version)
+		if routerHost == "" {
+			config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 			if err != nil {
 				if showSpinner {
-					upTunnelSpinner.Warning("No Bastion hosts found with atun.io tags.")
+					upTunnelSpinner.Warning("No Router hosts found with atun.io tags.")
 
 				} else {
-					logger.Warn("No Bastion hosts found with atun.io tags.", "error", err)
+					logger.Warn("No Router hosts found with atun.io tags.", "error", err)
 				}
 
-				config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+				config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 				if err != nil {
-					logger.Fatal("Error discovering bastion host", "error", err)
+					logger.Fatal("Error discovering router host", "error", err)
 				}
-				logger.Debug("Bastion host ID", "bastion", config.App.Config.BastionHostID)
-				upTunnelSpinner = ux.StartCustomSpinner(fmt.Sprintf("Starting tunnel via bastion host %s...", config.App.Config.BastionHostID))
+				logger.Debug("Router host ID", "router", config.App.Config.RouterHostID)
+				upTunnelSpinner = ux.StartCustomSpinner(fmt.Sprintf("Starting tunnel via router host %s...", config.App.Config.RouterHostID))
 
-				// TODO: suggest creating a bastion host.
-				// Use survey to ask if the user wants to create a bastion host
+				// TODO: suggest creating a router host.
+				// Use survey to ask if the user wants to create a router host
 				// If yes, run the create command
 				// If no, return
 
 			}
 		} else {
-			config.App.Config.BastionHostID = bastionHost
+			config.App.Config.RouterHostID = routerHost
 		}
 
-		bastionHostConfig, err := tunnel.GetBastionHostConfig(config.App.Config.BastionHostID)
+		routerHostConfig, err := tunnel.GetRouterHostConfig(config.App.Config.RouterHostID)
 		if err != nil {
-			logger.Fatal("Error getting bastion host config", "err", err)
+			logger.Fatal("Error getting router host config", "err", err)
 		}
 
-		config.App.Version = bastionHostConfig.Version
-		config.App.Config.Hosts = bastionHostConfig.Config.Hosts
-		config.App.Config.BastionHostUser = bastionHostConfig.Config.BastionHostUser
+		config.App.Version = routerHostConfig.Version
+		config.App.Config.Hosts = routerHostConfig.Config.Hosts
+		config.App.Config.RouterHostUser = routerHostConfig.Config.RouterHostUser
 
 		tunnelIsUp, connections, err := ssh.GetSSHTunnelStatus(config.App)
 
@@ -90,9 +90,9 @@ var statusCmd = &cobra.Command{
 			logger.Error("Failed to render connections table", "error", err)
 		}
 
-		config.App.Config.BastionHostID, err = tunnel.GetBastionHostIDFromTags()
+		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
-			logger.Error("Bastion host not found. You might want to create it.", "error", err)
+			logger.Error("Router host not found. You might want to create it.", "error", err)
 		}
 
 		detailedStatus, err := cmd.Flags().GetBool("detailed")
@@ -115,9 +115,9 @@ var statusCmd = &cobra.Command{
 			{"PWD", cwd},
 			{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
 			{"Config File", config.App.Config.ConfigFile},
-			{"Bastion Host", config.App.Config.BastionHostID},
-			{"Bastion Host User", config.App.Config.BastionHostUser},
-			{"Socket Path", ssh.GetBastionSockFilePath(config.App)},
+			{"Router Host", config.App.Config.RouterHostID},
+			{"Router Host User", config.App.Config.RouterHostUser},
+			{"Socket Path", ssh.GetRouterSockFilePath(config.App)},
 			{"SSH Config File", ssh.GetSSHConfigFilePath(config.App)},
 			{"Log Level", config.App.Config.LogLevel},
 
@@ -137,7 +137,7 @@ func init() {
 
 	// Here you will define your flags and configuration settings.d
 	statusCmd.Flags().BoolP("detailed", "d", defaultDetailedStatus, "Show detailed status")
-	statusCmd.PersistentFlags().StringP("bastion", "b", "", "Bastion instance id to use. If not specified the first running instance with the atun.io tags is used")
+	statusCmd.PersistentFlags().StringP("router", "b", "", "Router instance id to use. If not specified the first running instance with the atun.io tags is used")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

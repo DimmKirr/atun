@@ -14,20 +14,22 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
 type constraints struct {
-	configFile    bool
-	ssmplugin     bool
-	structure     bool
-	nvm           bool
-	awsProfile    bool
-	awsRegion     bool
-	env           bool
-	hostConfig    bool
-	bastionHostID bool
+	configFile   bool
+	ssmplugin    bool
+	structure    bool
+	nvm          bool
+	awsProfile   bool
+	awsRegion    bool
+	env          bool
+	hostConfig   bool
+	routerHostID bool
+	awsCLI       bool
 }
 
 // CheckConstraints checks if the constraints are met
@@ -67,9 +69,16 @@ func CheckConstraints(options ...Option) error {
 		}
 	}
 
-	if r.bastionHostID {
-		if err := validateBastionHostConfigID(config.App.Config); err != nil {
+	if r.routerHostID {
+		if err := validateRouterHostConfigID(config.App.Config); err != nil {
 			return err
+		}
+	}
+
+	if r.awsCLI {
+		_, err := exec.LookPath("aws")
+		if err != nil {
+			return fmt.Errorf("AWS CLI not found: %w", err)
 		}
 	}
 
@@ -138,9 +147,16 @@ func WithHostConfig() Option {
 	}
 }
 
-func WithBastionHostID() Option {
+func WithRouterHostID() Option {
 	return func(r *constraints) {
-		r.bastionHostID = true
+		r.routerHostID = true
+	}
+}
+
+// WithAWSCLI checks if the AWS CLI is installed
+func WithAWSCLI() Option {
+	return func(r *constraints) {
+		r.awsCLI = true
 	}
 }
 
@@ -202,9 +218,9 @@ func validateHostConfig(cfg *config.Atun) error {
 	return nil
 }
 
-func validateBastionHostConfigID(cfg *config.Config) error {
-	if cfg.BastionHostID == "" {
-		return errors.New("Bastion Host ID is not set.")
+func validateRouterHostConfigID(cfg *config.Config) error {
+	if cfg.RouterHostID == "" {
+		return errors.New("Router Host ID is not set.")
 	}
 	return nil
 }

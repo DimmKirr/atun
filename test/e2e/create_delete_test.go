@@ -149,7 +149,7 @@ func TestAtunCreateDelete(t *testing.T) {
 		{
 			name:           "Interactive terminal",
 			interactive:    true,
-			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			expectedOutput: "Creating Ad-Hoc EC2 Router Instance...",
 			envVars: map[string]string{
 				"TERM":                "xterm-256color",
 				"NO_COLOR":            "",
@@ -161,7 +161,7 @@ func TestAtunCreateDelete(t *testing.T) {
 		{
 			name:           "Non-interactive terminal",
 			interactive:    false,
-			expectedOutput: "Creating Ad-Hoc EC2 Bastion Instance...",
+			expectedOutput: "Creating Ad-Hoc EC2 Router Instance...",
 			envVars: map[string]string{
 				"TERM":           "",
 				"NO_COLOR":       "1",
@@ -348,8 +348,8 @@ func prepareWorkDir(t *testing.T, subnetID string, amiID string) string {
 	tmpDir, _ := os.MkdirTemp("", "atun")
 	content := fmt.Sprintf(`
 aws_profile = "localstack"
-bastion_subnet_id = "%s"
-bastion_host_ami = "%s"
+router_subnet_id = "%s"
+router_host_ami = "%s"
 [[hosts]]
 name = "ipconfig.io"
 proto = "ssm"

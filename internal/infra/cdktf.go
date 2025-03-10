@@ -120,12 +120,12 @@ func createStack(c *config.Config) {
 	logger.Debug("All constraints satisfied")
 
 	// Override the default ami if one is provided to atun
-	bastionHostAmi := ""
-	if config.App.Config.BastionHostAMI != "" {
-		bastionHostAmi = config.App.Config.BastionHostAMI
+	routerHostAmi := ""
+	if config.App.Config.RouterHostAMI != "" {
+		routerHostAmi = config.App.Config.RouterHostAMI
 	}
 
-	_, isPrivate, err := aws.CheckSubnetNetworkAccess(config.App.Config.BastionSubnetID)
+	_, isPrivate, err := aws.CheckSubnetNetworkAccess(config.App.Config.RouterSubnetID)
 	if err != nil {
 		logger.Fatal("Error checking subnet network access", "error", err)
 	}
@@ -133,48 +133,42 @@ func createStack(c *config.Config) {
 	var publicSubnets []string
 	var privateSubnets []string
 	if isPrivate {
-		privateSubnets = append(privateSubnets, config.App.Config.BastionSubnetID)
+		privateSubnets = append(privateSubnets, config.App.Config.RouterSubnetID)
 	} else {
-		publicSubnets = append(publicSubnets, config.App.Config.BastionSubnetID)
+		publicSubnets = append(publicSubnets, config.App.Config.RouterSubnetID)
 	}
 
 	// TODO: Add ability to specify other modules
 	terraformVariablesModules := map[string]interface{}{
 		"env":                 config.App.Config.Env,
-		"name":                config.App.Config.BastionInstanceName,
+		"name":                config.App.Config.RouterInstanceName,
 		"ec2_key_pair_name":   config.App.Config.AWSKeyPair,
 		"public_subnets":      publicSubnets,
 		"private_subnets":     privateSubnets,
 		"allowed_cidr_blocks": []string{"0.0.0.0/0"},
 		"instance_type":       config.App.Config.AWSInstanceType,
-		"instance_ami":        bastionHostAmi,
+		"instance_ami":        routerHostAmi,
 
-		"vpc_id": config.App.Config.BastionVPCID,
+		"vpc_id": config.App.Config.RouterVPCID,
 		"tags":   tags,
 	}
 
 	logger.Debug("Terraform Variables", "variables", terraformVariablesModules)
 
-	cdktf.NewTerraformHclModule(stack, jsii.String("Vpc"), &cdktf.TerraformHclModuleConfig{
-		// TODO: Make an abstraction atun-bastion module so anyone can fork and switch configs
-		Source:  jsii.String("hazelops/ec2-bastion/aws"),
+	cdktf.NewTerraformHclModule(stack, jsii.String("router"), &cdktf.TerraformHclModuleConfig{
+		// TODO: Make an abstraction atun-router module so anyone can fork and switch configs
+		Source:  jsii.String("hazelops/ec2-router/aws"),
 		Version: jsii.String("~>4.0"),
 
 		Variables: &terraformVariablesModules,
 	})
-
-	//cdktf.NewRemoteBackend(stack, &cdktf.RemoteBackendProps{
-	//	Hostname:     jsii.String("app.terraform.io"),
-	//	Organization: jsii.String("<YOUR_ORG>"),
-	//	Workspaces:   cdktf.NewNamedRemoteWorkspace(jsii.String("learn-cdktf")),
-	//})
 
 	app.Synth()
 }
 
 // ApplyCDKTF performs the 'apply' of theCDKTF stack
 func ApplyCDKTF(c *config.Config) error {
-	logger.Info("Applying CDKTF stack.", "profile", c.AWSProfile, "region", c.AWSRegion)
+	logger.Debug("Applying CDKTF stack.", "profile", c.AWSProfile, "region", c.AWSRegion)
 
 	createStack(c)
 	// Change to the synthesized directory
@@ -183,7 +177,7 @@ func ApplyCDKTF(c *config.Config) error {
 
 	// Ensure correct Terraform version is installed
 	if err := CheckTerraformVersion(); err != nil {
-		logger.Info("Installing required Terraform version", "version", c.TerraformVersion)
+		logger.Debug("Installing required Terraform version", "version", c.TerraformVersion)
 		if err := InstallTerraform(c.TerraformVersion); err != nil {
 			return fmt.Errorf("failed to install terraform: %w", err)
 		}
@@ -210,7 +204,8 @@ func ApplyCDKTF(c *config.Config) error {
 	cmd = exec.Command(terraformPath, "apply", "-auto-approve")
 	logger.Debug("Running terraform apply", "cmd", cmd)
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	// Only show Terraform if LogPlainText is enabled (EndUser doesn't need to see Terraform output)
+	if c.LogPlainText && (c.LogLevel == "info" || c.LogLevel == "debug") {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}

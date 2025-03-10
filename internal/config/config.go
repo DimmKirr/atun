@@ -36,12 +36,12 @@ type Config struct {
 	AWSEndpointUrl           string
 	AWSInstanceType          string
 	ConfigFile               string
-	BastionVPCID             string
-	BastionSubnetID          string
-	BastionHostID            string
-	BastionInstanceName      string
-	BastionHostAMI           string
-	BastionHostUser          string
+	RouterVPCID              string
+	RouterSubnetID           string
+	RouterHostID             string
+	RouterInstanceName       string
+	RouterHostAMI            string
+	RouterHostUser           string
 	AppDir                   string
 	TunnelDir                string
 	LogLevel                 string
@@ -151,7 +151,7 @@ func LoadConfig() error {
 	viper.SetDefault("SSH_KEY_PATH", filepath.Join(homeDir, ".ssh", "id_rsa"))
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", true)
 	viper.SetDefault("AWS_INSTANCE_TYPE", "t3.nano")
-	viper.SetDefault("BASTION_INSTANCE_NAME", "atun-bastion")
+	viper.SetDefault("ROUTER_INSTANCE_NAME", "atun-router")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
 	viper.SetDefault("LOG_PLAIN_TEXT", false)               // Set LOG_PLAIN_TEXT to false by default
@@ -170,12 +170,12 @@ func LoadConfig() error {
 			AWSKeyPair:               viper.GetString("AWS_KEY_PAIR"),
 			AWSInstanceType:          viper.GetString("AWS_INSTANCE_TYPE"),
 			AWSEndpointUrl:           viper.GetString("AWS_ENDPOINT_URL"),
-			BastionVPCID:             viper.GetString("BASTION_VPC_ID"),
-			BastionSubnetID:          viper.GetString("BASTION_SUBNET_ID"),
-			BastionHostID:            viper.GetString("BASTION_HOST_ID"),
-			BastionInstanceName:      viper.GetString("BASTION_INSTANCE_NAME"),
-			BastionHostAMI:           viper.GetString("BASTION_HOST_AMI"),
-			BastionHostUser:          viper.GetString("BASTION_HOST_USER"),
+			RouterVPCID:              viper.GetString("ROUTER_VPC_ID"),
+			RouterSubnetID:           viper.GetString("ROUTER_SUBNET_ID"),
+			RouterHostID:             viper.GetString("ROUTER_HOST_ID"),
+			RouterInstanceName:       viper.GetString("ROUTER_INSTANCE_NAME"),
+			RouterHostAMI:            viper.GetString("ROUTER_HOST_AMI"),
+			RouterHostUser:           viper.GetString("ROUTER_HOST_USER"),
 			ConfigFile:               viper.ConfigFileUsed(),
 			AppDir:                   appDir,
 			LogLevel:                 viper.GetString("LOG_LEVEL"),
@@ -202,7 +202,7 @@ func LoadConfig() error {
 	//
 	//pterm.Printfln("Config: %v", App.Config)
 
-	// TODO?: Maybe search for bastion host id during config stage?
+	// TODO?: Maybe search for router host id during config stage?
 	return nil
 }
 
@@ -217,8 +217,8 @@ func SaveConfig() error {
 	configFilePath := filepath.Join(currentDir, "atun.toml")
 
 	// TODO: Possibly find a better way to marshal the whole config
-	// Add bastion subnet id to the viper config
-	viper.Set("bastion_subnet_id", App.Config.BastionSubnetID)
+	// Add router subnet id to the viper config
+	viper.Set("router_subnet_id", App.Config.RouterSubnetID)
 
 	// Add hosts to the the config
 	viper.Set("hosts", App.Config.Hosts)
