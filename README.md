@@ -40,7 +40,7 @@ At the moment it has two types of tags: Atun Version and Atun Host.
 - **Host** Tag Name = `atun.io/host/<hostname>`
 - **Host** Tag Value = `{"local":"<local_port>","proto":"<protocol>","remote":<remote_port>}`
 
-### Host Config Description
+### endpoints config Description
 
 - local: port that would be bound on a local machine (your computer)
 - proto: protocol of forwarding (only `ssm` for now, but might be `k8s` or `cloudflare`)
@@ -52,8 +52,8 @@ At the moment it has two types of tags: Atun Version and Atun Host.
 |--------------------------------------------------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------|
 | `atun.io/version`                                                              | `1`                                             | Schema Version. It might change if significant changes would be intoduced |
 | `atun.io/env`                                                                  | `dev`                                           | Specified environment of the router host                                 |
-| `atun.io/host/nutcorp-api.cluster-xxxxxxxxxxxxxxx.us-east-1.rds.amazonaws.com` | `{"local":"23306","proto":"ssm","remote":3306}` | Describes host config and how to forward ports for a MySQL RDS            |
-| `atun.io/host/nutcorp.xxxxxx.0001.use0.cache.amazonaws.com`                    | `{"local":"26379","proto":"ssm","remote":6379}` | Describes host config and how to forward ports for ElastiCache Redis      |
+| `atun.io/host/nutcorp-api.cluster-xxxxxxxxxxxxxxx.us-east-1.rds.amazonaws.com` | `{"local":"23306","proto":"ssm","remote":3306}` | Describes endpoints config and how to forward ports for a MySQL RDS            |
+| `atun.io/host/nutcorp.xxxxxx.0001.use0.cache.amazonaws.com`                    | `{"local":"26379","proto":"ssm","remote":6379}` | Describes endpoints config and how to forward ports for ElastiCache Redis      |
 
 ## Usage
 There are two ways to use this tool: when an infra has a router with `atun.io` schema tags and when it doesn't have it yet.

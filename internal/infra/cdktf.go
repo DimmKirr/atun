@@ -46,14 +46,14 @@ func createStack(c *config.Config) {
 		Config:  c,
 	}
 
-	//hostConfigJSON, err := json.Marshal(Host{
+	//hostConfigJSON, err := json.Marshal(Endpoint{
 	//	Proto:  "ssm",
 	//	Remote: "22",
 	//	Local:  "10001",
 	//})
 	//
 	//if err != nil {
-	//	pterm.Error.Sprintf("Error marshalling host config: %v", err)
+	//	pterm.Error.Sprintf("Error marshalling endpoints config: %v", err)
 	//}
 	//
 	//tags := map[string]interface{}{
@@ -168,6 +168,17 @@ func createStack(c *config.Config) {
 
 // ApplyCDKTF performs the 'apply' of theCDKTF stack
 func ApplyCDKTF(c *config.Config) error {
+
+	if err := constraints.CheckConstraints(
+		constraints.WithSSMPlugin(),
+		constraints.WithAWSProfile(),
+		constraints.WithAWSRegion(),
+		constraints.WithENV(),
+		constraints.WithNodeJS(),
+	); err != nil {
+		logger.Fatal("Error checking constraints", "error", err)
+	}
+
 	logger.Debug("Applying CDKTF stack.", "profile", c.AWSProfile, "region", c.AWSRegion)
 
 	createStack(c)

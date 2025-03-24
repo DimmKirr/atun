@@ -25,36 +25,38 @@ type Atun struct {
 }
 
 type Config struct {
-	Hosts                    []Host
-	SSHKeyPath               string
-	SSHConfigFile            string
-	SSHStrictHostKeyChecking bool
-	SSHSocketFile            string
-	AWSProfile               string
-	AWSRegion                string
-	AWSKeyPair               string
-	AWSEndpointUrl           string
-	AWSInstanceType          string
-	ConfigFile               string
-	RouterVPCID              string
-	RouterSubnetID           string
-	RouterHostID             string
-	RouterInstanceName       string
-	RouterHostAMI            string
-	RouterHostUser           string
-	AppDir                   string
-	TunnelDir                string
-	LogLevel                 string
-	LogPlainText             bool
-	Env                      string
-	AutoAllocatePort         bool
-	TerraformVersion         string
+	Hosts                       []Endpoint
+	SSHKeyPath                  string
+	SSHConfigFile               string
+	SSHStrictHostKeyChecking    bool
+	SSHSocketFile               string
+	AWSProfile                  string
+	AWSRegion                   string
+	AWSKeyPair                  string
+	AWSEndpointUrl              string
+	AWSInstanceType             string
+	AWSMFASharedCredentialsFile string
+	AWSMFACode                  string
+	ConfigFile                  string
+	RouterVPCID                 string
+	RouterSubnetID              string
+	RouterHostID                string
+	RouterInstanceName          string
+	RouterHostAMI               string
+	RouterHostUser              string
+	AppDir                      string
+	TunnelDir                   string
+	LogLevel                    string
+	LogPlainText                bool
+	Env                         string
+	AutoAllocatePort            bool
+	TerraformVersion            string
 }
 
 // TODO: Add ability to add multiple ports for forwarding for one host
 //  (maybe <host>: [{"local":0, "remote":22, "proto": "ssm"}, {"local":0, "remote":443, "proto": "ssm"}])
 
-type Host struct {
+type Endpoint struct {
 	Name   string `jsonschema:"-"`
 	Proto  string `json:"proto" jsonschema:"proto"`
 	Remote int    `json:"remote" jsonschema:"remote"`
@@ -108,8 +110,9 @@ func LoadConfig() error {
 			logger.Debug("No config file found. Using defaults and environment variables.")
 		}
 	} else {
-		logger.Debug("Using config file:", "configFile", viper.ConfigFileUsed())
+		logger.Debug("Using config file", "configFile", viper.ConfigFileUsed())
 	}
+	logger.Debug("Re-initializing logger\n")
 
 	// Initialize the logger after config is read (second time, getting log level and plain text setting from config)
 	logger.Initialize(viper.GetString("LOG_LEVEL"), viper.GetBool("LOG_PLAIN_TEXT"))
@@ -145,7 +148,8 @@ func LoadConfig() error {
 			viper.SetDefault("AWS_ENDPOINT_URL", os.Getenv("AWS_ENDPOINT_URL"))
 		}
 		// No default intentionally to avoid confusion
-	}
+	} // Use AWS_ENDPOINT_URL env var as a default for viper AWS_ENDPOINT_URL
+	viper.SetDefault("AWS_MFA_SHARED_CREDENTIALS_FILE", filepath.Join(homeDir, ".aws", "credentials"))
 
 	// Set Default Values if none are set
 	viper.SetDefault("SSH_KEY_PATH", filepath.Join(homeDir, ".ssh", "id_rsa"))
@@ -161,27 +165,28 @@ func LoadConfig() error {
 	App = &Atun{
 		Version: "1",
 		Config: &Config{
-			Hosts:                    []Host{},
-			Env:                      viper.GetString("ENV"),
-			SSHKeyPath:               viper.GetString("SSH_KEY_PATH"),
-			SSHStrictHostKeyChecking: viper.GetBool("SSH_STRICT_HOST_KEY_CHECKING"),
-			AWSProfile:               viper.GetString("AWS_PROFILE"),
-			AWSRegion:                viper.GetString("AWS_REGION"),
-			AWSKeyPair:               viper.GetString("AWS_KEY_PAIR"),
-			AWSInstanceType:          viper.GetString("AWS_INSTANCE_TYPE"),
-			AWSEndpointUrl:           viper.GetString("AWS_ENDPOINT_URL"),
-			RouterVPCID:              viper.GetString("ROUTER_VPC_ID"),
-			RouterSubnetID:           viper.GetString("ROUTER_SUBNET_ID"),
-			RouterHostID:             viper.GetString("ROUTER_HOST_ID"),
-			RouterInstanceName:       viper.GetString("ROUTER_INSTANCE_NAME"),
-			RouterHostAMI:            viper.GetString("ROUTER_HOST_AMI"),
-			RouterHostUser:           viper.GetString("ROUTER_HOST_USER"),
-			ConfigFile:               viper.ConfigFileUsed(),
-			AppDir:                   appDir,
-			LogLevel:                 viper.GetString("LOG_LEVEL"),
-			LogPlainText:             viper.GetBool("LOG_PLAIN_TEXT"),
-			AutoAllocatePort:         viper.GetBool("AUTO_ALLOCATE_PORT"),
-			TerraformVersion:         viper.GetString("TERRAFORM_VERSION"),
+			Hosts:                       []Endpoint{},
+			Env:                         viper.GetString("ENV"),
+			SSHKeyPath:                  viper.GetString("SSH_KEY_PATH"),
+			SSHStrictHostKeyChecking:    viper.GetBool("SSH_STRICT_HOST_KEY_CHECKING"),
+			AWSProfile:                  viper.GetString("AWS_PROFILE"),
+			AWSRegion:                   viper.GetString("AWS_REGION"),
+			AWSKeyPair:                  viper.GetString("AWS_KEY_PAIR"),
+			AWSInstanceType:             viper.GetString("AWS_INSTANCE_TYPE"),
+			AWSEndpointUrl:              viper.GetString("AWS_ENDPOINT_URL"),
+			AWSMFASharedCredentialsFile: viper.GetString("AWS_MFA_SHARED_CREDENTIALS_FILE"),
+			RouterVPCID:                 viper.GetString("ROUTER_VPC_ID"),
+			RouterSubnetID:              viper.GetString("ROUTER_SUBNET_ID"),
+			RouterHostID:                viper.GetString("ROUTER_HOST_ID"),
+			RouterInstanceName:          viper.GetString("ROUTER_INSTANCE_NAME"),
+			RouterHostAMI:               viper.GetString("ROUTER_HOST_AMI"),
+			RouterHostUser:              viper.GetString("ROUTER_HOST_USER"),
+			ConfigFile:                  viper.ConfigFileUsed(),
+			AppDir:                      appDir,
+			LogLevel:                    viper.GetString("LOG_LEVEL"),
+			LogPlainText:                viper.GetBool("LOG_PLAIN_TEXT"),
+			AutoAllocatePort:            viper.GetBool("AUTO_ALLOCATE_PORT"),
+			TerraformVersion:            viper.GetString("TERRAFORM_VERSION"),
 		},
 		Session: nil,
 	}

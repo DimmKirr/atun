@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/constraints"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
@@ -29,70 +28,73 @@ var statusCmd = &cobra.Command{
 	Long: `Show status of the tunnel and current environment.
 	This is also useful for troubleshooting`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var routerHost string
-
-		logger.Debug("Status command called")
+		var routerHostID string
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("can't load options for a command: %w", err)
 		}
 
-		dt := pterm.DefaultTable
+		ux.Println("Checking Tunnel Status")
 
-		aws.InitAWSClients(config.App)
 		// Get the router host ID from the command line
-		routerHost = cmd.Flag("router").Value.String()
-
-		var upTunnelSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
+		routerHostID = cmd.Flag("router").Value.String()
 
 		// If router host is not provided, get the first running instance based on the discovery tag (atun.io/version)
-		if routerHost == "" {
+		if routerHostID == "" {
+			mfaInputRequired := aws.MFAInputRequired(config.App)
+
+			if mfaInputRequired {
+				pterm.Printfln(" %s Authenticating with AWS", pterm.LightBlue("▶︎"))
+				aws.InitAWSClients(config.App)
+			} else {
+				spinnerAWSAuth := ux.NewProgressSpinner("Authenticating with AWS")
+				aws.InitAWSClients(config.App)
+				spinnerAWSAuth.Success(fmt.Sprintf("Authenticated with AWS account %s", aws.GetAccountId()))
+			}
+			spinnerRouterDetection := ux.NewProgressSpinner("Detecting Atun routers in AWS")
 			config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 			if err != nil {
-				if showSpinner {
-					upTunnelSpinner.Warning("No Router hosts found with atun.io tags.")
-
-				} else {
-					logger.Warn("No Router hosts found with atun.io tags.", "error", err)
-				}
-
-				config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
-				if err != nil {
-					logger.Fatal("Error discovering router host", "error", err)
-				}
-				logger.Debug("Router host ID", "router", config.App.Config.RouterHostID)
-				upTunnelSpinner = ux.StartCustomSpinner(fmt.Sprintf("Starting tunnel via router host %s...", config.App.Config.RouterHostID))
-
-				// TODO: suggest creating a router host.
-				// Use survey to ask if the user wants to create a router host
-				// If yes, run the create command
-				// If no, return
-
+				err = fmt.Errorf("no --router flag specified and no EC2 instances with atun.io tags found in %s region of AWS account %s", config.App.Config.AWSRegion, aws.GetAccountId())
+				spinnerRouterDetection.Fail("No routers found", "error", err)
+				return err
 			}
+			spinnerRouterDetection.Success(fmt.Sprintf("Router found: %s", config.App.Config.RouterHostID))
 		} else {
-			config.App.Config.RouterHostID = routerHost
+			config.App.Config.RouterHostID = routerHostID
 		}
 
+		spinnerGetRouterHostConfig := ux.NewProgressSpinner("Getting router endpoints config")
 		routerHostConfig, err := tunnel.GetRouterHostConfig(config.App.Config.RouterHostID)
 		if err != nil {
-			logger.Fatal("Error getting router host config", "err", err)
+			spinnerGetRouterHostConfig.Fail("Error getting router endpoints config", "err", err)
 		}
+		spinnerGetRouterHostConfig.Success("Router endpoints config retrieved")
 
 		config.App.Version = routerHostConfig.Version
 		config.App.Config.Hosts = routerHostConfig.Config.Hosts
 		config.App.Config.RouterHostUser = routerHostConfig.Config.RouterHostUser
 
-		tunnelIsUp, connections, err := ssh.GetSSHTunnelStatus(config.App)
-
-		err = tunnel.RenderTunnelStatusTable(tunnelIsUp, connections)
+		spinnerGetSSHTunnelStatus := ux.NewProgressSpinner("Getting SSH tunnel status")
+		tunnelActive, endpoints, err := ssh.GetSSHTunnelStatus(config.App)
 		if err != nil {
-			logger.Error("Failed to render connections table", "error", err)
+			spinnerGetSSHTunnelStatus.Fail("Failed to get tunnel status", "error", err)
+		}
+		spinnerGetSSHTunnelStatus.Success("Tunnel status retrieved", "tunnelActive", tunnelActive)
+
+		ux.ClearLines(5)
+		//err = tunnel.RenderEndpointsTable(endpoints)
+		//if err != nil {
+		//	logger.Error("Failed to render endpoints table", "error", err)
+		//}
+
+		err = ux.RenderEndpointsTable(endpoints)
+		if err != nil {
+			logger.Error("Failed to render env table", "error", err)
 		}
 
 		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
-			logger.Error("Router host not found. You might want to create it.", "error", err)
+			logger.Error("Router not found. You might want to create it.", "error", err)
 		}
 
 		detailedStatus, err := cmd.Flags().GetBool("detailed")
@@ -105,6 +107,7 @@ var statusCmd = &cobra.Command{
 		}
 
 		logger.Debug("Getting detailed status")
+		dt := pterm.DefaultTable
 
 		// TODO: Hide this info behind --debug flag or move to a `debug` command
 		pterm.DefaultSection.Println("App Debug Info")
@@ -115,8 +118,8 @@ var statusCmd = &cobra.Command{
 			{"PWD", cwd},
 			{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
 			{"Config File", config.App.Config.ConfigFile},
-			{"Router Host", config.App.Config.RouterHostID},
-			{"Router Host User", config.App.Config.RouterHostUser},
+			{"Router Endpoint", config.App.Config.RouterHostID},
+			{"Router Endpoint User", config.App.Config.RouterHostUser},
 			{"Socket Path", ssh.GetRouterSockFilePath(config.App)},
 			{"SSH Config File", ssh.GetSSHConfigFilePath(config.App)},
 			{"Log Level", config.App.Config.LogLevel},
@@ -135,9 +138,8 @@ func init() {
 		defaultDetailedStatus = true
 	}
 
-	// Here you will define your flags and configuration settings.d
+	statusCmd.PersistentFlags().StringP("router", "r", "", "Router instance id to use. If not specified the first running instance with the atun.io tags is used")
 	statusCmd.Flags().BoolP("detailed", "d", defaultDetailedStatus, "Show detailed status")
-	statusCmd.PersistentFlags().StringP("router", "b", "", "Router instance id to use. If not specified the first running instance with the atun.io tags is used")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

@@ -13,7 +13,6 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/pterm/pterm"
 	"log"
 	"net"
 	"os"
@@ -21,26 +20,31 @@ import (
 	"strings"
 )
 
-// GetRouterHostIDFromTags retrieves the Router Host ID from AWS tags.
-// It takes a session, tag name, and tag value as parameters and returns the instance ID of the Router Host.
+// GetRouterHostIDFromTags retrieves the Router Endpoint ID from AWS tags.
+// It takes a session, tag name, and tag value as parameters and returns the instance ID of the Router Endpoint.
 func GetRouterHostIDFromTags() (string, error) {
-	// First try to find router host id from the running process
-	runningTunnels, err := ssh.GetRunningTunnels(config.App)
+	// First try to find router host id from the running processes
+	activeSSHTunnels, err := ssh.GetActiveSSHTunnels()
 	if err != nil {
 		logger.Debug("Error getting running tunnels", "error", err)
 		return "", err
 	}
 
-	logger.Debug("Running tunnels", "tunnels", runningTunnels)
+	logger.Debug("Running tunnels", "tunnels", activeSSHTunnels)
 
-	if len(runningTunnels) > 0 {
+	if len(activeSSHTunnels) > 0 {
 		// Get the router host ID from the running tunnels
-		for _, tunnel := range runningTunnels {
-			// Get the router host ID from the running tunnel
-			routerHostID := tunnel.RouterHostID
-			if routerHostID != "" {
-				return routerHostID, nil
+		var activeOwnedTunnels []config.Config
+		// Check if any of the tunnels have the same RouterHostID
+		for _, v := range activeSSHTunnels {
+			if v.RouterHostID == config.App.Config.RouterHostID {
+				logger.Debug("Found active tunnel with the current RouterHostID", "routerHostID", config.App.Config.RouterHostID)
+				activeOwnedTunnels = append(activeOwnedTunnels, v)
 			}
+		}
+
+		if len(activeOwnedTunnels) < 1 {
+			logger.Debug(fmt.Sprintf("No active tunnels found with the current RouterHostID", "routerHostID", config.App.Config.RouterHostID))
 		}
 	}
 
@@ -118,32 +122,32 @@ func GetRouterHostConfig(routerHostID string) (config.Atun, error) {
 				atun.Config.Env = v
 			case strings.HasPrefix(k, "atun.io/host/"):
 
-				var host config.Host
+				var endpoint config.Endpoint
 
-				err := json.Unmarshal([]byte(v), &host)
+				err := json.Unmarshal([]byte(v), &endpoint)
 				if err != nil {
-					logger.Error("Error unmarshalling host tags", "v", v, "host", host.Name, "error", err)
+					logger.Error("Error unmarshalling host tags", "v", v, "host", endpoint.Name, "error", err)
 					continue
 				}
 
-				host.Name = strings.TrimPrefix(k, "atun.io/host/")
+				endpoint.Name = strings.TrimPrefix(k, "atun.io/host/")
 
 				// Allocate free local port dynamically if set to 0
-				if host.Local == 0 {
+				if endpoint.Local == 0 {
 					if config.App.Config.AutoAllocatePort {
 						port, err := getFreePort()
 						if err != nil {
 							return config.Atun{}, err
 						}
-						host.Local = port
+						endpoint.Local = port
 					} else {
-						err = fmt.Errorf("can't allocate port %d", host.Local)
+						err = fmt.Errorf("can't allocate port %d", endpoint.Local)
 						return config.Atun{}, err
 					}
 				}
 
 				// Append the host to the Hosts config
-				atun.Config.Hosts = append(atun.Config.Hosts, host)
+				atun.Config.Hosts = append(atun.Config.Hosts, endpoint)
 			}
 		}
 	}
@@ -173,7 +177,7 @@ func SetAWSCredentials(sess *session.Session) error {
 	return nil
 }
 
-func StartTunnel(app *config.Atun) (bool, [][]string, error) {
+func ActivateTunnel(app *config.Atun) (bool, []ssh.Endpoint, error) {
 	logger.Debug("Starting tunnel", "router", app.Config.RouterHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
 
 	if err := SetAWSCredentials(app.Session); err != nil {
@@ -209,35 +213,26 @@ func StartTunnel(app *config.Atun) (bool, [][]string, error) {
 	return tunnelIsUp, connections, nil
 }
 
-// RenderTunnelStatusTable creates and renders a custom table with a given header and rows.
-// It can be reused throughout the project.
-func RenderTunnelStatusTable(status bool, rows [][]string) error {
-	header := []string{"Remote (Cloud)", "Local", "Status"}
-	// Print table title (optional)
-
-	// If status is true set statusIcon to🟢else 🔴
-	statusIcon := "🔴"
-	if status {
-		statusIcon = "🟢"
-	}
-	pterm.DefaultSection.Println("Tunnel " + statusIcon)
-	if !status {
-		pterm.FgGray.Println("Down")
-		return nil
-	}
-	// Create a new table
-	table := pterm.DefaultTable.WithHasHeader(true) // Table with a header row
-
-	// Set table data (header + rows)
-	data := append([][]string{header}, rows...) // Add header to the rows
-
-	// Render the table
-	err := table.WithData(data).Render()
+func DeactivateTunnel(app *config.Atun) (bool, error) {
+	tunnelActive, err := ssh.StopSSHTunnel(app)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	err = ssh.TerminateSSHProcessesWithRouterHostID(app.Config.RouterHostID)
+	if err != nil {
+		logger.Debug("Can't terminate SSH processes", "error", err)
+	}
+
+	err = ssh.TerminateSSMProcessesWithRouterHostID(app.Config.RouterHostID)
+	if err != nil {
+		logger.Debug("Can't terminate SSM processes", "error", err)
+	}
+
+	// Re-check status
+	tunnelActive, _, err = ssh.GetSSHTunnelStatus(app)
+
+	return tunnelActive, nil
 }
 
 // TODO: Fix auto-assign port logic

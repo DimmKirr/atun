@@ -32,30 +32,44 @@ var routerCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 
-		aws.InitAWSClients(config.App)
+		mfaInputRequired := aws.MFAInputRequired(config.App)
+		if mfaInputRequired {
+			pterm.Printfln(" %s Authenticating with AWS", pterm.LightBlue("▶︎"))
+			aws.InitAWSClients(config.App)
+		} else {
+			spinnerAWSAuth := ux.NewProgressSpinner("Authenticating with AWS")
+			aws.InitAWSClients(config.App)
+			spinnerAWSAuth.Success(fmt.Sprintf("Authenticated with AWS account %s", aws.GetAccountId()))
+		}
 
+		spinnerCheckConfig := ux.NewProgressSpinner("Checking if local config exists")
 		// Check if the configuration is loaded
 		if config.App.Config != nil {
-			logger.Debug("App config exists (via file, env vars or else). Checking Hosts Config")
+			if config.App.Config.ConfigFile != "" {
+				spinnerCheckConfig.Success(fmt.Sprintf("Router config file found. Deployment subnet: %s", config.App.Config.RouterSubnetID), "config", config.App.Config)
 
+			} else {
+				spinnerCheckConfig.Success(fmt.Sprintf("Router config found in env vars. Subnet %s", config.App.Config.RouterSubnetID))
+			}
+
+			spinnerCheckHostsConfig := ux.NewProgressSpinner("Checking if hosts config exists")
 			// If config is not loaded, offer to create a new configuration using survey package
 			if len(config.App.Config.Hosts) == 0 {
-				logger.Warn(
-					"No hosts found in the configuration.")
+				spinnerCheckHostsConfig.Warning("No hosts found in the configuration")
 
 				err = buildHostConfig(config.App)
 				if err != nil {
-					logger.Error("Error creating host config: %v", err)
+					logger.Error("Error creating endpoints config: %v", err)
 				}
 
 				// Use Survey to ask if the user wants to save the configuration
 				saveConfig := true
-				err = survey.AskOne(&survey.Confirm{
-					Message: "Would you like to save the configuration?",
-					Default: saveConfig,
-				}, &saveConfig)
+
+				// Use pterm.InteractiveConfirm for user confirmation
+
+				saveConfig, err := ux.GetConfirmation("Would you like to save the configuration?")
 				if err != nil {
-					logger.Fatal("Error getting confirmation:", "err", err)
+					log.Fatal("Error getting confirmation:", err)
 				}
 
 				if saveConfig {
@@ -68,11 +82,13 @@ var routerCreateCmd = &cobra.Command{
 
 				}
 
+			} else {
+				spinnerCheckHostsConfig.Success(fmt.Sprintf("%v hosts found in config", len(config.App.Config.Hosts)))
 			}
 			// TODO: Check for Subnet ID and if not ask for them
 			logger.Debug("Hosts Config exists.", "hosts", config.App.Config.Hosts)
 		} else {
-			logger.Warn("No configuration file found.")
+			spinnerCheckConfig.Success("No config found. Creating a new one.")
 		}
 
 		// Verify all constraints are met
@@ -121,24 +137,20 @@ var routerCreateCmd = &cobra.Command{
 				}, &config.App.Config.RouterSubnetID, survey.WithValidator(survey.Required))
 			}
 
-			logger.Debug("Getting VPC ID from Subnet ID", "Subnet ID", config.App.Config.RouterSubnetID)
+			spinnerGetVPCID := ux.NewProgressSpinner("Getting VPC ID from Subnet ID")
 			config.App.Config.RouterVPCID, err = aws.GetVPCIDFromSubnet(config.App.Config.RouterSubnetID)
 			if err != nil {
-				logger.Fatal("Error getting VPC ID from Subnet ID", "err", err)
+				spinnerGetVPCID.Fail(fmt.Sprintf("Error getting VPC ID from Subnet ID %s. Is your local config correct? \n%v", config.App.Config.RouterSubnetID, err))
+
+				return fmt.Errorf("can't provision router host")
 			}
+
 		}
 		logger.Debug("Obtained VPC ID from the Subnet ID", "RouterVPCID", config.App.Config.RouterVPCID)
 
 		// Create and start a fork of the default spinner.
-		var createRouterInstanceSpinner *pterm.SpinnerPrinter
-		showSpinner := config.App.Config.LogLevel != "debug" && config.App.Config.LogLevel != "info" && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes()
+		createRouterInstanceSpinner := ux.NewProgressSpinner("Creating Ad-Hoc EC2 Router Instance...")
 
-		if showSpinner {
-			createRouterInstanceSpinner = ux.StartCustomSpinner("Creating Ad-Hoc EC2 Router Instance...")
-		} else {
-			logger.Debug("Not showing spinner", "logLevel", config.App.Config.LogLevel)
-			logger.Info("Creating Ad-Hoc EC2 Router Instance...")
-		}
 		// Apply the configuration using CDKTF
 		err = infra.ApplyCDKTF(config.App.Config)
 		if err != nil {
@@ -146,57 +158,35 @@ var routerCreateCmd = &cobra.Command{
 			logger.Error("Error running CDKTF", "err", err)
 			return err
 		}
-
-		if showSpinner {
-			createRouterInstanceSpinner.UpdateText("CDKTF stack applied successfully")
-		} else {
-			logger.Info("CDKTF stack applied successfully")
-		}
+		createRouterInstanceSpinner.UpdateText("CDKTF stack applied successfully")
 
 		// Get RouterHostID
 		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
 			logger.Fatal("Error discovering router host", "error", err)
 		}
-
-		if showSpinner {
-			createRouterInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.RouterHostID))
-		} else {
-			logger.Debug("Waiting for the instance to be running...", "routerHostID", config.App.Config.RouterHostID)
-		}
+		createRouterInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.RouterHostID))
 
 		// Wait until the instance is ready to accept SSM connections
 		err = aws.WaitForInstanceReady(config.App.Config.RouterHostID)
 		if err != nil {
-			if showSpinner {
-				createRouterInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
-			} else {
-				logger.Fatal("Error waiting for instance to be ready", "RouterHostID", config.App.Config.RouterHostID, "error", err)
-				os.Exit(1)
-			}
-		}
+			createRouterInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
 
-		if showSpinner {
-			createRouterInstanceSpinner.Success(fmt.Sprintf("Router Host %s is ready. Run `atun up`.", config.App.Config.RouterHostID))
-		} else {
-			logger.Debug("Instance is ready", "routerHostID", config.App.Config.RouterHostID)
 		}
+		createRouterInstanceSpinner.Success(fmt.Sprintf("Router Endpoint %s is ready. Run `atun up`.", config.App.Config.RouterHostID))
 
 		return nil
 	},
 }
 
 func buildHostConfig(app *config.Atun) error {
-	logger.Debug("Building host config")
+	logger.Debug("Building endpoints config")
 
 	var err error
 
 	// Confirm the selection
 	startSurvey := false
-	err = survey.AskOne(&survey.Confirm{
-		Message: fmt.Sprintf("Would you like to create a new host configuration?"),
-		Default: true,
-	}, &startSurvey)
+	startSurvey, err = ux.GetConfirmation("Create a new endpoint configuration?")
 	if err != nil {
 		logger.Fatal("Error getting confirmation:", "err", err)
 		return err
@@ -216,26 +206,30 @@ func buildHostConfig(app *config.Atun) error {
 		return err
 	}
 
-	// Prompt for Subnet ID using survey with validation
-	err = survey.AskOne(&survey.Select{
-		Message: "Select AWS Subnet ID:",
-		Options: func() []string {
-			var options []string
-			for _, subnet := range subnets {
-				options = append(options, *subnet.SubnetId)
+	// Prompt for Subnet ID using pterm InteractiveSelect
+	options := []string{}
+	subnetMap := map[string]string{}
+
+	for _, subnet := range subnets {
+		var name string
+		for _, tag := range subnet.Tags {
+			if *tag.Key == "Name" {
+				name = *tag.Value
 			}
-			return options
-		}(),
-		Description: func(value string, index int) string {
-			var name string
-			for _, tag := range subnets[index].Tags {
-				if *tag.Key == "Name" {
-					name = *tag.Value
-				}
-			}
-			return fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnets[index].CidrBlock, name, *subnets[index].VpcId)
-		},
-	}, &app.Config.RouterSubnetID, survey.WithValidator(survey.Required))
+		}
+		displayText := fmt.Sprintf("CIDR: %s, Name: %s, VPC ID: %s", *subnet.CidrBlock, name, *subnet.VpcId)
+		options = append(options, displayText)
+		subnetMap[displayText] = *subnet.SubnetId
+	}
+
+	selectedSubnetID, err := ux.GetInteractiveSelection("Select Subnet ID", options)
+
+	if err != nil {
+		logger.Fatal("Error selecting subnet:", "err", err)
+	}
+
+	app.Config.RouterSubnetID = subnetMap[selectedSubnetID]
+
 	if err != nil {
 		log.Fatalf("Error getting Subnet ID: %v", err)
 		return err
@@ -249,19 +243,18 @@ func buildHostConfig(app *config.Atun) error {
 	}
 
 	// Ask user to pick a key pair
-	err = survey.AskOne(&survey.Select{
-		Message: "Select AWS Key Pair:",
-		Options: func() []string {
-			var options []string
-			for _, keyPair := range keyPairs {
-				options = append(options, *keyPair.KeyName)
-			}
-			return options
-		}(),
-		Description: func(value string, index int) string {
-			return fmt.Sprintf("(Created on %s, Signature: %s)", *keyPairs[index].CreateTime, *keyPairs[index].KeyFingerprint)
-		},
-	}, &app.Config.AWSKeyPair, survey.WithValidator(survey.Required))
+	selectedAWSKeyPair, err := ux.GetInteractiveSelection("Select AWS Key Pair", func() []string {
+		var options []string
+		for _, keyPair := range keyPairs {
+			options = append(options, *keyPair.KeyName)
+		}
+		return options
+	}())
+	if err != nil {
+		log.Fatalf("Error getting AWS Key Pair: %v", err)
+		return err
+	}
+	app.Config.AWSKeyPair = selectedAWSKeyPair
 	if err != nil {
 		log.Fatalf("Error getting AWS Key Pair: %v", err)
 		return err
@@ -298,12 +291,12 @@ func buildHostConfig(app *config.Atun) error {
 	}
 
 	// Clear the hosts slice
-	app.Config.Hosts = []config.Host{}
+	app.Config.Hosts = []config.Endpoint{}
 
 	// Ask 4 questions for each host and then ask if there is one more host to add
 	for i := 0; ; i++ {
 
-		host := config.Host{}
+		host := config.Endpoint{}
 
 		// Determine defaults based on the current iteration and `app.Config.Hosts`
 		var defaultHost, defaultProtocol, defaultRemotePort, defaultLocalPort string
@@ -324,30 +317,28 @@ func buildHostConfig(app *config.Atun) error {
 		}
 
 		// Ask for host name
-		err = survey.AskOne(&survey.Input{
-			Message: "Enter DNS of the AWS-based host (nutcorp-api.cluster-xxxxxxxxxxxxxxx.us-east-1.rds.amazonaws.com):",
-			Default: defaultHost,
-			//Default: "nutcorp-api.cluster-xxxxxxxxxxxxxxx.us-east-1.rds.amazonaws.com", // Test only
-		}, &host.Name, survey.WithValidator(survey.Required))
+		host.Name, err = ux.GetTextInput("Enter Endpoint Name", defaultHost)
 		if err != nil {
-			log.Fatalf("Error getting Host Name: %v", err)
+			log.Fatalf("Error getting Endpoint Name: %v", err)
 			return err
 		}
 
 		// Ask for tunnel protocol
-		err = survey.AskOne(&survey.Select{
-			Message: "Select Host Protocol:",
-			Options: []string{"ssm", "k8s", "ssh"},
-			Default: defaultProtocol,
-			Description: func(value string, index int) string {
-				if value == "ssm" {
-					return "This is the only option supported (for now). But it's human nature to have an illusion of choice."
-				}
-				return ""
-			},
-		}, &host.Proto, survey.WithValidator(survey.Required))
+		//err = survey.AskOne(&survey.Select{
+		//	Message: "Select Endpoint Protocol:",
+		//	Options: []string{"ssm", "k8s", "ssh"},
+		//	Default: defaultProtocol,
+		//	Description: func(value string, index int) string {
+		//		if value == "ssm" {
+		//			return "This is the only option supported (for now). But it's human nature to have an illusion of choice."
+		//		}
+		//		return ""
+		//	},
+		//}, &host.Proto, survey.WithValidator(survey.Required))
+
+		host.Proto, err = ux.GetInteractiveSelection("Select Endpoint Protocol", []string{"ssm", "k8s", "ssh"}, defaultProtocol)
 		if err != nil {
-			logger.Fatal("Error getting Host Protocol", err)
+			logger.Fatal("Error getting Endpoint Protocol", err)
 
 			return err
 		}
@@ -373,18 +364,15 @@ func buildHostConfig(app *config.Atun) error {
 		var remotePortSurveyAnswer string
 
 		// Ask for host remote port
-		err = survey.AskOne(&survey.Input{
-			Message: "Enter Host Remote Port",
-			Default: defaultRemotePort,
-		}, &remotePortSurveyAnswer, survey.WithValidator(survey.Required))
+		remotePortSurveyAnswer, err = ux.GetTextInput("Enter Remote Port", defaultRemotePort)
 		if err != nil {
-			log.Fatalf("Error getting Host Remote Port: %v", err)
+			log.Fatalf("Error getting Endpoint Remote Port: %v", err)
 			return err
 		}
 
 		host.Remote, err = strconv.Atoi(remotePortSurveyAnswer)
 		if err != nil {
-			log.Fatalf("Error converting Host Remote Port to int: %v", err)
+			log.Fatalf("Error converting Endpoint Remote Port to int: %v", err)
 			return err
 		}
 
@@ -392,18 +380,15 @@ func buildHostConfig(app *config.Atun) error {
 		var localPortSurveyAnswer string
 
 		// Ask for host local port
-		err = survey.AskOne(&survey.Input{
-			Message: "Enter a free local port on your machine:",
-			Default: defaultLocalPort,
-		}, &localPortSurveyAnswer, survey.WithValidator(survey.Required))
+		localPortSurveyAnswer, err = ux.GetTextInput("Enter Local Port", defaultLocalPort)
 		if err != nil {
-			logger.Fatal("Error getting Host Local Port", err)
+			logger.Fatal("Error getting Endpoint Local Port", err)
 			return err
 		}
 
 		host.Local, err = strconv.Atoi(localPortSurveyAnswer)
 		if err != nil {
-			logger.Fatal("Error converting Host Local Port to int", err)
+			logger.Fatal("Error converting Endpoint Local Port to int", err)
 		}
 
 		// Add the host to the list

@@ -24,6 +24,7 @@ type constraints struct {
 	ssmplugin    bool
 	structure    bool
 	nvm          bool
+	nodejs       bool
 	awsProfile   bool
 	awsRegion    bool
 	env          bool
@@ -114,10 +115,24 @@ func WithNVM() Option {
 		r.nvm = true
 	}
 }
-
 func checkNVM() error {
 	if len(os.Getenv("NVM_DIR")) == 0 {
 		return errors.New("nvm is not installed (visit https://github.com/nvm-sh/nvm)")
+	}
+
+	return nil
+}
+
+func WithNodeJS() Option {
+	return func(r *constraints) {
+		r.nodejs = true
+	}
+}
+
+func checkNodeJS() error {
+	exist, _ := CheckCommand("node", []string{"--version"})
+	if !exist {
+		return errors.New("nodejs is required for CDKTF but it's not installed (visit https://nodejs.org/en/download/)")
 	}
 
 	return nil
@@ -187,29 +202,29 @@ func validateEnv(cfg *config.Config) error {
 // ValidateEnv checks if ENV is set in the config
 func validateHostConfig(cfg *config.Atun) error {
 	if len(cfg.Config.Hosts) == 0 {
-		//logger.Debug("Elements found in host config. Checking contents)
+		//logger.Debug("Elements found in endpoints config. Checking contents)
 
-		return errors.New("Host Config is not set. Please set it via command line or environment variables.")
+		return errors.New("endpoints config is not set. Please set it via command line or environment variables.")
 	}
 
-	// Check if cfg.Hosts has all required fields according to the Host struct
+	// Check if cfg.Hosts has all required fields according to the Endpoint struct
 	for _, host := range cfg.Config.Hosts {
 		if host.Name == "" {
-			return errors.New("Host Name is not set. Please set it via config file.")
+			return errors.New("Endpoint Name is not set. Please set it via config file.")
 		}
 
 		// Check if host.Remote (integer) is not more than 0
 		if host.Remote <= 0 {
-			return errors.New("Host Remote port is not set. Please set it via config file.")
+			return errors.New("Endpoint Remote port is not set. Please set it via config file.")
 		}
 
 		if host.Local < 0 {
-			return errors.New("Host Local port is not set. Please set it via config file.")
+			return errors.New("Endpoint Local port is not set. Please set it via config file.")
 		}
 
 		if host.Proto == "" {
 			{
-				return errors.New("Host Protocol is not set. Please set it via config file.")
+				return errors.New("Endpoint Protocol is not set. Please set it via config file.")
 			}
 
 		}
@@ -220,7 +235,7 @@ func validateHostConfig(cfg *config.Atun) error {
 
 func validateRouterHostConfigID(cfg *config.Config) error {
 	if cfg.RouterHostID == "" {
-		return errors.New("Router Host ID is not set.")
+		return errors.New("Router Endpoint ID is not set.")
 	}
 	return nil
 }

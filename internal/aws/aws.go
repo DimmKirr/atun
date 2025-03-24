@@ -31,27 +31,30 @@ func InitAWSClients(app *config.Atun) {
 	// Ensure all constraints are met
 	if err := constraints.CheckConstraints(
 		constraints.WithAWSProfile(),
-		//constraints.WithAWSRegion(),
 	); err != nil {
 		pterm.Error.Println("Failed to check constraints:", err)
 		os.Exit(1)
 	}
 
-	// Init AWS Session (probably should be moved to a separate function)
+	// Init AWS Session
 	sess, err := GetSession(&SessionConfig{
-		Region:      app.Config.AWSRegion,
-		Profile:     app.Config.AWSProfile,
-		EndpointUrl: app.Config.AWSEndpointUrl,
+		Region:                   app.Config.AWSRegion,
+		Profile:                  app.Config.AWSProfile,
+		EndpointUrl:              app.Config.AWSEndpointUrl,
+		MFASharedCredentialsPath: app.Config.AWSMFASharedCredentialsFile,
 	})
+
 	if err != nil {
 		logger.Fatal("Failed to initialize AWS session", "error", err)
 	}
+
 	if config.App.Config.AWSRegion == "" {
 		logger.Debug("AWS Region not set. Setting it to the default value", "region", *sess.Config.Region)
 		config.App.Config.AWSRegion = *sess.Config.Region
 	}
 
 	logger.Debug("AWS Session initialized")
+
 	app.Session = sess
 }
 
@@ -686,4 +689,15 @@ func ConnectToSSMConsole(instanceID string) error {
 	}
 
 	return nil
+}
+
+// MFAInputRequired checks if MFA is required for the current session
+func MFAInputRequired(app *config.Atun) bool {
+	mfaUpdateRequired, err := isMFAUpdateRequired(app.Config.AWSMFASharedCredentialsFile, app.Config.AWSProfile)
+	if err != nil {
+		logger.Error("Failed to check MFA requirement", "error", err)
+		return true
+	}
+
+	return mfaUpdateRequired
 }

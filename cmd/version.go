@@ -6,12 +6,16 @@
 package cmd
 
 import (
+	"context"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/constraints"
+	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ux"
 	"github.com/automationd/atun/internal/version"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"os"
+	"os/signal"
 )
 
 // versionCmd represents the version command
@@ -26,32 +30,34 @@ var versionCmd = &cobra.Command{
 
 		// Detect if current terminal is capable of displaying ASCII art
 		// If not, disable it
+		if !constraints.SupportsANSIEscapeCodes() || constraints.IsCI() {
+			logger.Debug("Terminal doesn't support ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
+			logger.Debug("Terminal is CI", "isCI", constraints.IsCI())
 
-		if !config.App.Config.LogPlainText && constraints.IsInteractiveTerminal() && constraints.SupportsANSIEscapeCodes() {
-			//stopChan := make(chan struct{})
-			//go func() {
+			// If the terminal is non-interactive or doesn't support ANSI, enable plain text logging automatically (even if it's set to false)
+			config.App.Config.LogPlainText = true
+		} else {
+			logger.Debug("Terminal supports ANSI escape codes")
+			config.App.Config.LogPlainText = false
+		}
 
-			ux.RenderAsciiArt()
+		if !config.App.Config.LogPlainText {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			//close(stopChan)
-			//}()
+			go func() {
+				ux.RenderAsciiArt()
+				cancel()
+			}()
 
-			//go func() {
-			//	if err := keyboard.Open(); err != nil {
-			//		panic(err)
-			//	}
-			//	defer keyboard.Close()
-			//
-			//	for {
-			//		char, key, err := keyboard.GetKey()
-			//		if err == nil && (char == 'q' || key == keyboard.KeyEsc || key == keyboard.KeyEnter) {
-			//			stopChan <- struct{}{}
-			//			break
-			//		}
-			//	}
-			//}()
-			//
-			//<-stopChan
+			// Listen for interrupt signal (ctrl+c)
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, os.Interrupt)
+			select {
+			case <-c:
+				cancel()
+			case <-ctx.Done():
+			}
 		}
 
 	},
@@ -59,13 +65,4 @@ var versionCmd = &cobra.Command{
 
 func init() {
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// versionCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// versionCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
