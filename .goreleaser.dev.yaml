@@ -36,7 +36,7 @@ checksum:
   name_template: "{{ .ProjectName }}-checksums.txt"
 
 brews:
-  - name: atun
+  - name: atun-dev
     repository:
       owner: AutomationD
       name: homebrew-tap
@@ -78,13 +78,11 @@ brews:
       bin.install "atun"
 
 scoops:
-  - name: atun
+  - name: atun-dev
     url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    directory: atun
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
     commit_msg_template: "{{ .ProjectName }} {{ .Tag }} update"
     description: "Atun is a simple SSM/SSH tunnel manager"
     license: Apache License 2.0
@@ -96,9 +94,8 @@ scoops:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
-  - name: atun-dev
+  - name: atun-dev@{{ .Version }}
     url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    directory: atun-dev
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
