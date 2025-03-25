@@ -4,23 +4,22 @@
 SSH tunnel cli tool that works without local configuration. It uses EC2 tags to define hosts and ports forwarding
 configuration.
 `atun.io/` [schema namespace](#tag-metadata-schema) can be used to configure an SSM tunnel.
+![Demo](./demo.svg)
+
+
+
 ![img.png](img.png)
 
 ## WIP
-
 This tool is still in development and versions before 1.0.0 might have breaking changes.
 Be ready that commits might be squashed/reset and tags might be rewritten until 1.0.0
 
 ## Quickstart
-
 ### Install from Homebrew
 ```bash
 brew tap automationd/tap
 brew install atun
 ```
-
-
-[![asciicast](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r.svg)](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r)
 
 ## Features
 
