@@ -28,7 +28,8 @@ brew install atun
 
 ### Install with Scoop
 ```PowerShell
-
+scoop bucket add automationd https://github.com/automationd/scoop-bucket.git
+scoop install atun
 ```
 
 ## Features
