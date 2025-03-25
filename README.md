@@ -20,10 +20,15 @@ Be ready that commits might be squashed/reset and tags might be rewritten until 
 
 
 ## Quickstart
-### Install from Homebrew
+### Install with Homebrew
 ```bash
 brew tap automationd/tap
 brew install atun
+```
+
+### Install with Scoop
+```PowerShell
+
 ```
 
 ## Features
