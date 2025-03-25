@@ -203,7 +203,7 @@ func ApplyCDKTF(c *config.Config) error {
 	// Initialize Terraform
 	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -216,7 +216,7 @@ func ApplyCDKTF(c *config.Config) error {
 	logger.Debug("Running terraform apply", "cmd", cmd)
 	cmd.Dir = synthDir
 	// Only show Terraform if LogPlainText is enabled (EndUser doesn't need to see Terraform output)
-	if c.LogPlainText && (c.LogLevel == "info" || c.LogLevel == "debug") {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -246,7 +246,7 @@ func DestroyCDKTF(c *config.Config) error {
 	// Initialize Terraform
 	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -257,7 +257,7 @@ func DestroyCDKTF(c *config.Config) error {
 	// Destroy Terraform
 	cmd = exec.Command(terraformPath, "destroy", "-auto-approve")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}

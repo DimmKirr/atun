@@ -31,7 +31,6 @@ var upCmd = &cobra.Command{
 
 		var err error
 		var routerHost string
-		logger.Debug("Up command called", "router", routerHost, "aws profile", config.App.Config.AWSProfile, "env", config.App.Config.Env)
 
 		if err := constraints.CheckConstraints(
 			constraints.WithSSMPlugin(),

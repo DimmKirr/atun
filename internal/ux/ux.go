@@ -7,12 +7,15 @@ package ux
 
 import (
 	"fmt"
+	"github.com/automationd/atun/internal/aws"
 	"github.com/automationd/atun/internal/config"
 	"github.com/automationd/atun/internal/logger"
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/pterm/pterm"
 	"io"
+	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -513,4 +516,62 @@ func GetInteractiveSelection(message string, options []string, defaultValues ...
 	result = strings.TrimPrefix(result, prefix)
 
 	return result, err
+}
+
+// RenderRouterTable displays a formatted table of routers
+func RenderRouterTable(routers []config.RouterInfo) {
+	if len(routers) == 0 {
+		logger.Info("No routers found")
+		return
+	}
+
+	// Sort routers by creation time (newest first)
+	sort.Slice(routers, func(i, j int) bool {
+		return routers[i].CreatedAt.After(routers[j].CreatedAt)
+	})
+
+	// Create the table data
+	tableData := [][]string{
+		{"ID", "TYPE", "STATE", "CREATED"},
+	}
+
+	for _, router := range routers {
+		tableData = append(tableData, []string{
+			router.ID,
+			router.Type,
+			router.State,
+			router.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	// Render table
+	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+}
+
+func RenderDetailedStatus() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		logger.Error("Error getting current working directory", "error", err)
+	}
+
+	dt := pterm.DefaultTable
+
+	pterm.DefaultSection.Println("Extended Info")
+	_ = dt.WithData(pterm.TableData{
+		{"AWS_ACCOUNT", aws.GetAccountId()},
+		{"AWS_PROFILE", config.App.Config.AWSProfile},
+		{"AWS_REGION", config.App.Config.AWSRegion},
+		{"PWD", cwd},
+		{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
+		{"Config File", config.App.Config.ConfigFile},
+		{"Router Endpoint", config.App.Config.RouterHostID},
+		{"Router Endpoint User", config.App.Config.RouterHostUser},
+		{"Socket Path", ssh.GetRouterSockFilePath(config.App)},
+		{"SSH Config File", ssh.GetSSHConfigFilePath(config.App)},
+		{"Log Level", config.App.Config.LogLevel},
+
+		//{"Toggle", toggleValue},
+	}).WithLeftAlignment().Render()
+	logger.Debug("Status command finished")
+
 }

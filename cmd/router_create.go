@@ -83,7 +83,7 @@ var routerCreateCmd = &cobra.Command{
 				}
 
 			} else {
-				spinnerCheckHostsConfig.Success(fmt.Sprintf("%v hosts found in config", len(config.App.Config.Hosts)))
+				spinnerCheckHostsConfig.Success(fmt.Sprintf("%v hosts found in local config", len(config.App.Config.Hosts)))
 			}
 			// TODO: Check for Subnet ID and if not ask for them
 			logger.Debug("Hosts Config exists.", "hosts", config.App.Config.Hosts)
@@ -144,9 +144,9 @@ var routerCreateCmd = &cobra.Command{
 
 				return fmt.Errorf("can't provision router host")
 			}
+			spinnerGetVPCID.Success(fmt.Sprintf("Obtained VPC ID from the Subnet ID: %s", config.App.Config.RouterVPCID))
 
 		}
-		logger.Debug("Obtained VPC ID from the Subnet ID", "RouterVPCID", config.App.Config.RouterVPCID)
 
 		// Create and start a fork of the default spinner.
 		createRouterInstanceSpinner := ux.NewProgressSpinner("Creating Ad-Hoc EC2 Router Instance...")
@@ -158,22 +158,23 @@ var routerCreateCmd = &cobra.Command{
 			logger.Error("Error running CDKTF", "err", err)
 			return err
 		}
-		createRouterInstanceSpinner.UpdateText("CDKTF stack applied successfully")
+		createRouterInstanceSpinner.Success("CDKTF stack applied successfully")
 
 		// Get RouterHostID
 		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
 			logger.Fatal("Error discovering router host", "error", err)
 		}
-		createRouterInstanceSpinner.UpdateText(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.RouterHostID))
+
+		instanceIsReadySpinner := ux.NewProgressSpinner(fmt.Sprintf("Waiting for the instance %s to be running...", config.App.Config.RouterHostID))
 
 		// Wait until the instance is ready to accept SSM connections
 		err = aws.WaitForInstanceReady(config.App.Config.RouterHostID)
 		if err != nil {
-			createRouterInstanceSpinner.Fail("Failed to add local SSH Public key to the instance")
+			instanceIsReadySpinner.Fail(fmt.Sprintf("Instance %s is still not ready", config.App.Config.RouterHostID), err)
 
 		}
-		createRouterInstanceSpinner.Success(fmt.Sprintf("Router Endpoint %s is ready. Run `atun up`.", config.App.Config.RouterHostID))
+		instanceIsReadySpinner.Success(fmt.Sprintf("Router Endpoint %s is ready. Run `atun up`.", config.App.Config.RouterHostID))
 
 		return nil
 	},

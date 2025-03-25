@@ -13,12 +13,9 @@ import (
 	"github.com/automationd/atun/internal/ssh"
 	"github.com/automationd/atun/internal/tunnel"
 	"github.com/automationd/atun/internal/ux"
-	"github.com/spf13/viper"
-
 	"github.com/pterm/pterm"
-	"os"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // statusCmd represents the status command
@@ -29,9 +26,15 @@ var statusCmd = &cobra.Command{
 	This is also useful for troubleshooting`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var routerHostID string
-		cwd, err := os.Getwd()
+		var err error
+
 		if err != nil {
 			return fmt.Errorf("can't load options for a command: %w", err)
+		}
+
+		detailedStatus, err := cmd.Flags().GetBool("detailed")
+		if err != nil {
+			return fmt.Errorf("can't get detailed flag: %w", err)
 		}
 
 		ux.Println("Checking Tunnel Status")
@@ -54,9 +57,13 @@ var statusCmd = &cobra.Command{
 			spinnerRouterDetection := ux.NewProgressSpinner("Detecting Atun routers in AWS")
 			config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 			if err != nil {
-				err = fmt.Errorf("no --router flag specified and no EC2 instances with atun.io tags found in %s region of AWS account %s", config.App.Config.AWSRegion, aws.GetAccountId())
-				spinnerRouterDetection.Fail("No routers found", "error", err)
-				return err
+				spinnerRouterDetection.Fail(fmt.Sprintf("No routers found. No --router flag has not been specified and no EC2 instances with atun.io tags found in %s region of AWS account %s.", config.App.Config.AWSRegion, aws.GetAccountId()))
+				if detailedStatus {
+					ux.RenderDetailedStatus()
+				}
+
+				return nil
+
 			}
 			spinnerRouterDetection.Success(fmt.Sprintf("Router found: %s", config.App.Config.RouterHostID))
 		} else {
@@ -96,37 +103,10 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			logger.Error("Router not found. You might want to create it.", "error", err)
 		}
-
-		detailedStatus, err := cmd.Flags().GetBool("detailed")
-		if err != nil {
-			return fmt.Errorf("can't get detailed flag: %w", err)
+		if detailedStatus {
+			ux.RenderDetailedStatus()
 		}
 
-		if !detailedStatus {
-			os.Exit(0)
-		}
-
-		logger.Debug("Getting detailed status")
-		dt := pterm.DefaultTable
-
-		// TODO: Hide this info behind --debug flag or move to a `debug` command
-		pterm.DefaultSection.Println("App Debug Info")
-		_ = dt.WithData(pterm.TableData{
-			{"AWS_ACCOUNT", aws.GetAccountId()},
-			{"AWS_PROFILE", config.App.Config.AWSProfile},
-			{"AWS_REGION", config.App.Config.AWSRegion},
-			{"PWD", cwd},
-			{"SSH_KEY_PATH", config.App.Config.SSHKeyPath},
-			{"Config File", config.App.Config.ConfigFile},
-			{"Router Endpoint", config.App.Config.RouterHostID},
-			{"Router Endpoint User", config.App.Config.RouterHostUser},
-			{"Socket Path", ssh.GetRouterSockFilePath(config.App)},
-			{"SSH Config File", ssh.GetSSHConfigFilePath(config.App)},
-			{"Log Level", config.App.Config.LogLevel},
-
-			//{"Toggle", toggleValue},
-		}).WithLeftAlignment().Render()
-		logger.Debug("Status command finished")
 		return nil
 	},
 }

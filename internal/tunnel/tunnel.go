@@ -155,6 +155,8 @@ func GetRouterHostConfig(routerHostID string) (config.Atun, error) {
 	return atun, nil
 
 }
+
+// SetAWSCredentials sets AWS credentials as environment variables
 func SetAWSCredentials(sess *session.Session) error {
 	v, err := sess.Config.Credentials.Get()
 	if err != nil {
@@ -177,6 +179,7 @@ func SetAWSCredentials(sess *session.Session) error {
 	return nil
 }
 
+// ActivateTunnel starts the SSH tunnel and SSM plugin
 func ActivateTunnel(app *config.Atun) (bool, []ssh.Endpoint, error) {
 	logger.Debug("Starting tunnel", "router", app.Config.RouterHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
 
@@ -213,6 +216,7 @@ func ActivateTunnel(app *config.Atun) (bool, []ssh.Endpoint, error) {
 	return tunnelIsUp, connections, nil
 }
 
+// DeactivateTunnel stops the SSH tunnel and SSM plugin
 func DeactivateTunnel(app *config.Atun) (bool, error) {
 	tunnelActive, err := ssh.StopSSHTunnel(app)
 	if err != nil {

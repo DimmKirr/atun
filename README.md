@@ -20,8 +20,7 @@ brew install atun
 ```
 
 
-![demo.gif](demo.gif)
-_(This is a MOCK Demo. Will update it soon)_
+[![asciicast](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r.svg)](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r)
 
 ## Features
 

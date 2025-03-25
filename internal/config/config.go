@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/automationd/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -51,6 +52,7 @@ type Config struct {
 	Env                         string
 	AutoAllocatePort            bool
 	TerraformVersion            string
+	DemoMode                    bool
 }
 
 // TODO: Add ability to add multiple ports for forwarding for one host
@@ -61,6 +63,14 @@ type Endpoint struct {
 	Proto  string `json:"proto" jsonschema:"proto"`
 	Remote int    `json:"remote" jsonschema:"remote"`
 	Local  int    `json:"local" jsonschema:"local"`
+}
+
+// RouterInfo represents the information about a router
+type RouterInfo struct {
+	ID        string
+	Type      string
+	State     string
+	CreatedAt time.Time
 }
 
 var App *Atun
@@ -160,6 +170,7 @@ func LoadConfig() error {
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
 	viper.SetDefault("LOG_PLAIN_TEXT", false)               // Set LOG_PLAIN_TEXT to false by default
 	viper.SetDefault("TERRAFORM_VERSION", "latest")         // Default to latest Terraform version
+	viper.SetDefault("DEMO_MODE", false)                    // Default to false
 
 	// TODO?: Move init a separate file with correct imports of config
 	App = &Atun{
@@ -187,6 +198,7 @@ func LoadConfig() error {
 			LogPlainText:                viper.GetBool("LOG_PLAIN_TEXT"),
 			AutoAllocatePort:            viper.GetBool("AUTO_ALLOCATE_PORT"),
 			TerraformVersion:            viper.GetString("TERRAFORM_VERSION"),
+			DemoMode:                    viper.GetBool("DEMO_MODE"),
 		},
 		Session: nil,
 	}

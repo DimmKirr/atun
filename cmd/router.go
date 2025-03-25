@@ -1,18 +1,8 @@
 package cmd
 
 import (
-	"time"
-
 	"github.com/spf13/cobra"
 )
-
-// RouterInfo represents the information about a router
-type RouterInfo struct {
-	ID        string
-	Type      string
-	State     string
-	CreatedAt time.Time
-}
 
 // routerCmd represents the router command
 var routerCmd = &cobra.Command{

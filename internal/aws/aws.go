@@ -199,8 +199,11 @@ func GetAccountId() string {
 		logger.Error("Error getting account ID", "error", err)
 		return ""
 	}
-
-	return *result.Account
+	accountID := *result.Account
+	if config.App.Config.DemoMode {
+		accountID = "000000000000"
+	}
+	return accountID
 }
 
 // GetSSMWhoAmI checks if the SSH public key is present in the instance
