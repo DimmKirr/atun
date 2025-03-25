@@ -20,7 +20,7 @@ brew install atun
 ```
 
 
-[![asciicast](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r.svg)](https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r)
+<script src="https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r.js" id="asciicast-TPOK0zuNi9Vc76DtM1Nrurs3r" async="true"></script>
 
 ## Features
 
