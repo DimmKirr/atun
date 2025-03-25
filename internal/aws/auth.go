@@ -10,31 +10,28 @@ import (
 	"github.com/automationd/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/sirupsen/logrus"
 	"os"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/ini.v1"
 )
 
-const (
-	path = "/.aws/credentials-mfa"
-)
-
 type SessionConfig struct {
-	Region      string
-	Profile     string
-	EndpointUrl string
+	Region                   string
+	Profile                  string
+	EndpointUrl              string
+	SharedCredentialsPath    string
+	MFASharedCredentialsPath string
 }
 
-func GetSession(c *SessionConfig) (*session.Session, error) {
-	upd := false
+func GetSession(sessionConfig *SessionConfig) (*session.Session, error) {
 
 	// Check if the env var is set and if not set it to the default value. (Maybe there is a better way to do this?)
 	credFilePath := os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
@@ -43,7 +40,7 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get home directory: %w", err)
 		}
-		credFilePath = fmt.Sprintf("%s/.aws/credentials", homeDir)
+		credFilePath = path.Join(homeDir, ".aws/credentials")
 	}
 
 	// Get region from the credentials file if it's not set
@@ -52,23 +49,23 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 		return nil, err
 	}
 
-	profile, err := credFile.GetSection(c.Profile)
+	profile, err := credFile.GetSection(sessionConfig.Profile)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.Region == "" {
-		logger.Debug("Region is not set, trying to get it from the credentials file", "profile", c.Profile)
-		c.Region = profile.Key("region").String()
+	if sessionConfig.Region == "" {
+		logger.Debug("Region is not set, trying to get it from the credentials file", "profile", sessionConfig.Profile)
+		sessionConfig.Region = profile.Key("region").String()
 	}
 
 	var config *aws.Config
 
-	if c.EndpointUrl != "" {
-		config = aws.NewConfig().WithRegion(c.Region).WithCredentials(credentials.NewSharedCredentials(credFilePath, c.Profile)).WithEndpoint(c.EndpointUrl)
-		logger.Debug("Session established", "credFilePath", credFilePath, "endpoint", c.EndpointUrl)
+	if sessionConfig.EndpointUrl != "" {
+		config = aws.NewConfig().WithRegion(sessionConfig.Region).WithCredentials(credentials.NewSharedCredentials(credFilePath, sessionConfig.Profile)).WithEndpoint(sessionConfig.EndpointUrl)
+		logger.Debug("Session established", "credFilePath", credFilePath, "endpoint", sessionConfig.EndpointUrl)
 	} else {
-		config = aws.NewConfig().WithRegion(c.Region).WithCredentials(credentials.NewSharedCredentials("", c.Profile))
+		config = aws.NewConfig().WithRegion(sessionConfig.Region).WithCredentials(credentials.NewSharedCredentials("", sessionConfig.Profile))
 		logger.Debug("Session established with a default endpoint", "credFilePath", credFilePath)
 	}
 
@@ -79,14 +76,14 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 		return nil, err
 	}
 	iamSess := iam.New(sess)
-	logger.Debug("Authenticating with AWS", "profile", c.Profile, "region", c.Region, "endpointURL", iamSess.Endpoint, "credFilePath", credFilePath, "iamSess", iamSess)
+	logger.Debug("Authenticating with AWS", "profile", sessionConfig.Profile, "region", sessionConfig.Region, "endpointURL", iamSess.Endpoint, "credFilePath", credFilePath, "iamSess", iamSess)
 
 	devices, err := iamSess.ListMFADevices(&iam.ListMFADevicesInput{})
 	if aerr, ok := err.(awserr.Error); ok {
 		switch aerr.Code() {
 		case "SharedCredsLoad":
-			logger.Debug("AWS profile is not valid", "Profile", c.Profile)
-			return nil, fmt.Errorf("AWS profile is not valid (used `%s`). Please set correct AWS_PROFILE via AWS_PROFILE env var, --aws-profile flag or aws_profile config entry in atun.toml", c.Profile)
+			logger.Debug("AWS profile is not valid", "Profile", sessionConfig.Profile)
+			return nil, fmt.Errorf("AWS profile is not valid (used `%s`). Please set correct AWS_PROFILE via AWS_PROFILE env var, --aws-profile flag or aws_profile config entry in atun.toml", sessionConfig.Profile)
 		default:
 			// If the endpoint is localhost (LocalStack) then it's not an error
 			if !(strings.Contains(iamSess.Endpoint, "localhost") || strings.Contains(iamSess.Endpoint, "127.0.0.1")) {
@@ -94,74 +91,39 @@ func GetSession(c *SessionConfig) (*session.Session, error) {
 				return nil, err
 			}
 
-			logrus.Debug("[NO MFA] Using Endpoint: ", iamSess.Endpoint)
+			logger.Debug("[NO MFA] Using Endpoint: ", iamSess.Endpoint)
 		}
 	}
 
+	// If there are no MFA devices, return the session
 	if len(devices.MFADevices) == 0 {
 		return sess, nil
 	}
 
-	home, _ := os.UserHomeDir()
-	filePath := home + path
-
-	credFile, err = ini.Load(filePath)
+	mfaUpdateRequired, err := isMFAUpdateRequired(sessionConfig.MFASharedCredentialsPath, sessionConfig.Profile)
 	if err != nil {
-		credFile = ini.Empty(ini.LoadOptions{})
-		upd = true
+		return nil, err
 	}
 
-	var sect *ini.Section
-	var exp *ini.Key
-
-	if !upd {
-		sect, err = credFile.GetSection(fmt.Sprintf("%s-mfa", c.Profile))
-		if err != nil {
-			upd = true
-		}
-	}
-
-	if !upd {
-		if len(sect.KeyStrings()) != 4 {
-			upd = true
-		}
-	}
-
-	if !upd {
-		exp, err = sect.GetKey("token_expiration")
-		if err != nil {
-			upd = true
-		}
-	}
-
-	if !upd {
-		timeExp, err := time.Parse("2006-01-02T15:04:05Z07:00", exp.String())
-		if err != nil {
-			upd = true
-		}
-
-		if timeExp.Before(time.Now().UTC()) {
-			upd = true
-		}
-	}
-
-	if upd {
+	if mfaUpdateRequired {
 		cred, err := getNewToken(sess, devices.MFADevices[0].SerialNumber)
 		if err != nil {
 			return nil, err
 		}
 
-		err = writeCredsToFile(cred, credFile, filePath, c.Profile)
+		mfaCredFile, err := ini.Load(sessionConfig.MFASharedCredentialsPath)
+		err = writeCredsToFile(cred, mfaCredFile, sessionConfig.MFASharedCredentialsPath, sessionConfig.Profile)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	// Create a new session with the MFA credentials
 	sess, err = session.NewSessionWithOptions(
 		session.Options{
-			Config:            *aws.NewConfig().WithRegion(c.Region),
-			Profile:           fmt.Sprintf("%s-mfa", c.Profile),
-			SharedConfigFiles: []string{filePath},
+			Config:            *aws.NewConfig().WithRegion(sessionConfig.Region),
+			Profile:           fmt.Sprintf("%s-mfa", sessionConfig.Profile),
+			SharedConfigFiles: []string{sessionConfig.MFASharedCredentialsPath},
 		},
 	)
 	if err != nil {
@@ -185,21 +147,21 @@ func GetTestSession(c *SessionConfig) (*session.Session, error) {
 	return sess, nil
 }
 
-func getNewToken(sess *session.Session, sn *string) (*sts.Credentials, error) {
+func getNewToken(sess *session.Session, serialNumber *string) (*sts.Credentials, error) {
 	stsSvc := sts.New(sess)
 
-	token, err := stscreds.StdinTokenProvider()
+	mfaCode, err := stscreds.StdinTokenProvider()
 	if err != nil {
 		return nil, err
 	}
 
 	out, err := stsSvc.GetSessionToken(&sts.GetSessionTokenInput{
-		SerialNumber: sn,
-		TokenCode:    &token,
+		SerialNumber: serialNumber,
+		TokenCode:    &mfaCode,
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get session token: %w", err)
 	}
 
 	return out.Credentials, nil
@@ -234,4 +196,58 @@ func writeCredsToFile(creds *sts.Credentials, f *ini.File, filepath, profile str
 	}
 
 	return nil
+}
+
+func isMFAUpdateRequired(mfaCredFilePath string, profile string) (bool, error) {
+	var err error
+
+	updateRequired := false
+	mfaCredFile, err := ini.Load(mfaCredFilePath)
+	if err != nil {
+		mfaCredFile = ini.Empty(ini.LoadOptions{})
+		updateRequired = true
+	}
+
+	var sect *ini.Section
+	var exp *ini.Key
+
+	if !updateRequired {
+		sect, err = mfaCredFile.GetSection(fmt.Sprintf("%s-mfa", profile))
+		if err != nil {
+			updateRequired = true
+		}
+	}
+
+	if !updateRequired {
+		if len(sect.KeyStrings()) != 4 {
+			updateRequired = true
+		}
+	}
+
+	if !updateRequired {
+		exp, err = sect.GetKey("token_expiration")
+		if err != nil {
+			updateRequired = true
+		}
+	}
+
+	if !updateRequired {
+		timeExp, err := time.Parse("2006-01-02T15:04:05Z07:00", exp.String())
+		if err != nil {
+			updateRequired = true
+		}
+
+		if timeExp.Before(time.Now().UTC()) {
+			updateRequired = true
+		}
+	}
+	return updateRequired, nil
+}
+
+func GetMFASharedCredentialsPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return path.Join(homeDir, ".aws/credentials-mfa"), nil
 }

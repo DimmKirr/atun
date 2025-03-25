@@ -24,6 +24,14 @@ import (
 )
 
 // TODO: Refactor GetSSHCommandArgs into separate functions
+type Endpoint struct {
+	LocalHost  string
+	LocalPort  int
+	RemoteHost string
+	RemotePort int
+	Protocol   string
+	Status     bool
+}
 
 // GetPublicKey gets the public key from the private key
 func GetPublicKey(path string) (string, error) {
@@ -68,7 +76,7 @@ ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartS
 `
 
 	for _, host := range app.Config.Hosts {
-		logger.Debug("Host", "name", host.Name, "proto", host.Proto, "remote", host.Remote, "local", host.Local)
+		logger.Debug("Endpoint", "name", host.Name, "proto", host.Proto, "remote", host.Remote, "local", host.Local)
 		sshConfigContent += fmt.Sprintf("LocalForward %d %s:%d\n", host.Local, host.Name, host.Remote)
 	}
 
@@ -106,12 +114,54 @@ func GetSSMPluginStatus(app *config.Atun) (bool, error) {
 	return true, nil
 }
 
-func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
+func GetSSHTunnelStatus(app *config.Atun) (bool, []Endpoint, error) {
 	// TODO: Add port check too to make sure to see outrun tunnels
+	var endpoints []Endpoint
+
+	// Pre-populate Endpoints
+	for _, v := range app.Config.Hosts {
+		logger.Debug("Endpoint", "name", v.Name, "proto", v.Proto, "remote", v.Remote, "local", v.Local)
+
+		endpoints = append(endpoints, Endpoint{
+			LocalHost:  "127.0.0.1",
+			LocalPort:  v.Local,
+			RemoteHost: v.Name,
+			RemotePort: v.Remote,
+			Protocol:   v.Proto,
+			Status:     false,
+		})
+	}
+	// Get all active tunnels (all environments)
+	activeSSHTunnels, err := GetActiveSSHTunnels()
+	if err != nil {
+		logger.Debug("No running tunnels found")
+		return false, endpoints, nil
+	}
+
+	if len(activeSSHTunnels) < 1 {
+		logger.Debug("No running ssh tunnel processes found")
+		return false, endpoints, nil
+	}
+
+	var activeOwnedTunnels []config.Config
+	// Check if any of the tunnels have the same RouterHostID
+	for _, v := range activeSSHTunnels {
+		if v.RouterHostID == app.Config.RouterHostID {
+			logger.Debug("Found running tunnel with the current RouterHostID", "routerHostID", app.Config.RouterHostID)
+			activeOwnedTunnels = append(activeOwnedTunnels, v)
+		}
+	}
+
+	if len(activeOwnedTunnels) < 1 {
+		logger.Debug("No running tunnels found with the current RouterHostID", "routerHostID", app.Config.RouterHostID)
+		return false, nil, nil
+	}
+
+	logger.Debug("Found running tunnels", "tunnels", activeOwnedTunnels)
 
 	routerSockFilePath := GetRouterSockFilePath(app)
 
-	// If a router socket file exists, check the tunnel status
+	// If a router socket file exists, check the tunnel status by sending an ssh command and then checking the port
 	if _, err := os.Stat(routerSockFilePath); !os.IsNotExist(err) {
 		logger.Debug("An existing tunnel socket found", "path", routerSockFilePath)
 
@@ -128,39 +178,37 @@ func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 		logger.Debug("Running SSH command", "command", cmd.String())
 		sshMasterProcessOutput, err := cmd.CombinedOutput()
 		if err != nil {
-			return false, nil, fmt.Errorf("failed to check status of the tunnel (or get output from SSH command): %w", err)
+			logger.Debug("Error checking status of the tunnel", "error", err)
 		}
 
 		if strings.Contains(string(sshMasterProcessOutput), "running") {
-
-			var connections [][]string
-
 			// Fill in connections with the tunnel connections from Hosts
-			for _, v := range app.Config.Hosts {
-				var tunnelStatus string
+			for k, v := range endpoints {
+				var endpointActive bool
 
-				logger.Debug("Host", "name", v.Name, "proto", v.Proto, "remote", v.Remote, "local", v.Local)
+				//logger.Debug("Endpoint", "name", v.Name, "proto", v.Proto, "remote", v.Remote, "local", v.Local)
+
+				// TODO: Get args too to get the full connection to match the env / routerID
 				// check if the v.Local port is occupied
-				portUsed, processName, err := CheckPort(v.Local)
+				portUsed, processName, err := CheckPort(v.LocalPort)
 				if err != nil {
 					log.Fatalf("Error checking port status: %v", err)
 				}
 
 				if portUsed && processName == "ssh" {
-					tunnelStatus = "🟢"
-					logger.Debug("Port is occupied by ssh", "port", v.Local)
+					endpointActive = true
+					logger.Debug("Port is occupied by ssh", "port", v.LocalPort)
 				} else {
-					tunnelStatus = "🔴"
-					logger.Debug("Port is not used by ssh", "port", v.Local)
+					endpointActive = false
+					logger.Debug("Port is not used by ssh", "port", v.LocalPort)
 				}
 
-				logger.Debug("Port status", "port", v.Local, "status", portUsed)
+				logger.Debug("Port status", "port", v.LocalPort, "status", portUsed)
 
-				connections = append(connections, []string{fmt.Sprintf("%s:%d", v.Name, v.Remote), fmt.Sprintf("127.0.0.1:%d", v.Local), tunnelStatus})
-
+				endpoints[k].Status = endpointActive
 			}
 
-			return true, connections, nil
+			return true, endpoints, nil
 		} else {
 			logger.Debug("Master Tunnel is not running", "output", sshMasterProcessOutput)
 		}
@@ -170,7 +218,7 @@ func GetSSHTunnelStatus(app *config.Atun) (bool, [][]string, error) {
 	}
 
 	logger.Debug("Tunnel socket not found. Tunnel is not running", "path", routerSockFilePath)
-	return false, nil, nil
+	return false, endpoints, nil
 }
 
 func StartSSHTunnel(app *config.Atun) error {
@@ -180,12 +228,12 @@ func StartSSHTunnel(app *config.Atun) error {
 
 	// Check if the router socket file exists
 
-	tunnelStatus, _, err := GetSSHTunnelStatus(app)
+	tunnelActive, _, err := GetSSHTunnelStatus(app)
 	if err != nil {
 		return fmt.Errorf("failed to get tunnel status: %w", err)
 	}
 
-	if !tunnelStatus {
+	if !tunnelActive {
 		logger.Debug("Tunnel socket not found. Creating a new one", "path", routerSockFilePath)
 		args = []string{"-M", "-t", "-S", routerSockFilePath, "-fN"}
 
@@ -316,14 +364,14 @@ func StopSSHTunnel(app *config.Atun) (bool, error) {
 	}
 
 	logger.Error("Tunnel is still active. Likely a bug")
-	return true, nil
+	return true, nil // return true, meaning tunnel status is "on"
 }
 
 func GetRouterSockFilePath(app *config.Atun) string {
 	logger.Debug("Getting router socket file path", "tunnelDir", app.Config.TunnelDir, "env", app.Config.Env, "routerHostID", app.Config.RouterHostID)
 
 	if app.Config.RouterHostID == "" {
-		logger.Debug("Can't find Router Host ID is not set. Assuming router id from existing socket file")
+		logger.Debug("Can't find Router Endpoint ID is not set. Assuming router id from existing socket file")
 
 	}
 
@@ -334,7 +382,8 @@ func GetSSHConfigFilePath(app *config.Atun) string {
 	return path.Join(app.Config.TunnelDir, fmt.Sprintf("%s-ssh.config", app.Config.RouterHostID))
 }
 
-func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
+// GetActiveSSHTunnels gets all active SSH tunnels on this machine (all environments)
+func GetActiveSSHTunnels() ([]config.Config, error) {
 	var runningTunnels []config.Config
 	///  ssh -M -t -S /Users/dmitry/.atun/adhoc-nutcorp-dev/i-059cde3acc2a0c8eb-tunnel.sock -fN -o StrictHostKeyChecking=no ec2-user@i-059cde3acc2a0c8eb -F /var/folders/g1/g6vwr5j95c76bc5tnq0ky2t40000gn/T/atun-ssh.config647105965 -i /Users/dmitry/.ssh/id_rsa
 
@@ -414,33 +463,6 @@ func GetRunningTunnels(c *config.Atun) ([]config.Config, error) {
 		}
 	}
 	return runningTunnels, nil
-}
-
-// TestSSHConnection tries to establish an SSH connection to the router host
-func TestSSHConnection(app *config.Atun) error {
-	routerSockFilePath := GetRouterSockFilePath(app)
-
-	args := []string{"-S", routerSockFilePath, "-O", "check", fmt.Sprintf("%s@%s", app.Config.RouterHostUser, app.Config.RouterHostID)}
-
-	cmd := exec.Command("ssh", args...)
-	cmd.Dir = app.Config.AppDir
-
-	if app.Config.LogLevel == "debug" {
-		cmd.Args = append(cmd.Args, "-vvv")
-	}
-
-	logger.Debug("Running SSH command", "command", cmd.String())
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to establish SSH connection: %w", err)
-	}
-
-	if strings.Contains(string(output), "Master running") {
-		logger.Debug("Test SSH connection established successfully")
-		return nil
-	}
-
-	return fmt.Errorf("test SSH connection failed to establish: %s", output)
 }
 
 // CheckPort checks if the port is occupied and returns true/false and also process name
@@ -538,4 +560,54 @@ func GetRouterHostIDFromExistingSession(tunnelDir string) (string, error) {
 	// TODO: attempt to get it from ssm processes
 
 	return "", fmt.Errorf("no router host ID found in the tunnel directory")
+}
+
+// TerminateSSHProcessesWithRouterHostID terminates all SSH processes that have BastionHostID in their command line
+func TerminateSSHProcessesWithRouterHostID(bastionHostID string) error {
+	processes, err := process.Processes()
+	if err != nil {
+		return fmt.Errorf("error retrieving processes: %w", err)
+	}
+
+	for _, proc := range processes {
+		cmdline, err := proc.Cmdline()
+		if err != nil {
+			continue // Skip processes with inaccessible command lines
+		}
+
+		if strings.Contains(cmdline, bastionHostID) {
+			if err := proc.Terminate(); err != nil {
+				logger.Error("Failed to terminate process", "pid", proc.Pid, "error", err)
+			} else {
+				logger.Debug("Terminated process", "pid", proc.Pid)
+			}
+		}
+	}
+
+	return nil
+}
+
+// TerminateSSMProcessesWithRouterHostID terminates all SSM processes that have RouterHostID in their command line
+func TerminateSSMProcessesWithRouterHostID(routerHostID string) error {
+	processes, err := process.Processes()
+	if err != nil {
+		return fmt.Errorf("error retrieving processes: %w", err)
+	}
+
+	for _, proc := range processes {
+		cmdline, err := proc.Cmdline()
+		if err != nil {
+			continue // Skip processes with inaccessible command lines
+		}
+
+		if strings.Contains(cmdline, routerHostID) && strings.Contains(cmdline, "session-manager-plugin") {
+			if err := proc.Terminate(); err != nil {
+				logger.Error("Failed to terminate process", "pid", proc.Pid, "error", err)
+			} else {
+				logger.Info("Terminated process", "pid", proc.Pid)
+			}
+		}
+	}
+
+	return nil
 }

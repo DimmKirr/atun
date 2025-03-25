@@ -36,7 +36,6 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// TODO: Use Method receiver. Create atun (config) here
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
@@ -123,11 +122,13 @@ func initializeAtun() {
 	config.App.Config.TunnelDir = filepath.Join(config.App.Config.AppDir, fmt.Sprintf("%s-%s", config.App.Config.Env, config.App.Config.AWSProfile))
 
 	if !constraints.SupportsANSIEscapeCodes() || constraints.IsCI() {
-		logger.Debug("Terminal supports ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
+		logger.Debug("Terminal doesn't support ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
 		logger.Debug("Terminal is CI", "isCI", constraints.IsCI())
 
-		// If the terminal is non-interactive or doesn't support ANSI enable plain text logging automatically (even if it's set to true)
+		// If the terminal is non-interactive or doesn't support ANSI, enable plain text logging automatically (even if it's set to false)
 		config.App.Config.LogPlainText = true
+	} else {
+		logger.Debug("Terminal supports ANSI escape codes")
 	}
 
 	logger.Debug("Tunnel directory set. Ensuring it exists", "tunnelDir", config.App.Config.TunnelDir)

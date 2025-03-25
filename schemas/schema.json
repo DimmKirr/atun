@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Atun.io EC2 Tag Schema",
-  "description": "Schema for EC2 tags used by Atun.io compatible clients for versioning and host configurations.",
+  "description": "Schema for EC2 tags used by Atun.io compatible clients for versioning and endpoints configurations.",
   "type": "object",
   "properties": {
     "atun.io/version": {
@@ -41,7 +41,7 @@
           "additionalProperties": false
         }
       },
-      "description": "Host configuration tags with hostname and forwarding details"
+      "description": "endpoints configuration tags with hostname and forwarding details"
     }
   },
   "required": ["atun.io/version","atun.io/env","atun.io/host"],

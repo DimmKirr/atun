@@ -6,6 +6,7 @@
 package logger
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 	"log/slog"
 	"os"
@@ -15,40 +16,6 @@ import (
 )
 
 var defaultLogger *slog.Logger
-
-// ApplyPtermTheme applies custom styles to pterm
-func ApplyPtermTheme() {
-	// Customize INFO prefix
-	pterm.Info.Prefix = pterm.Prefix{
-		Text:  "ℹ️",                                     // Custom prefix text
-		Style: pterm.NewStyle(pterm.FgCyan, pterm.Bold), // Cyan + Bold
-	}
-
-	// Customize WARNING prefix
-	pterm.Warning.Prefix = pterm.Prefix{
-		Text:  "⚠️",
-		Style: pterm.NewStyle(pterm.FgYellow, pterm.Bold),
-	}
-
-	// Customize SUCCESS prefix
-	pterm.Success.Prefix = pterm.Prefix{
-		Text:  "✅",
-		Style: pterm.NewStyle(pterm.FgGreen, pterm.Bold),
-	}
-
-	// Customize ERROR prefix
-	pterm.Error.Prefix = pterm.Prefix{
-		Text:  "❌",
-		Style: pterm.NewStyle(pterm.FgRed, pterm.Bold),
-	}
-
-	// Customize DEBUG prefix (no timestamp)
-	pterm.Debug.Prefix = pterm.Prefix{
-		Text:  "🐞 DEBUG",
-		Style: pterm.NewStyle(pterm.FgMagenta), // Magenta text for debug
-	}
-
-}
 
 // Initialize sets up the logger with a specified log level
 func Initialize(logLevel string, logPlainText bool) {
@@ -71,10 +38,11 @@ func Initialize(logLevel string, logPlainText bool) {
 
 	// Configure slog with a text handler
 	handler := pterm.NewSlogHandler(&pterm.DefaultLogger)
+
 	pterm.DefaultLogger.Level = ptermLogLevel
 	if !logPlainText {
 		// Use text-only logging style
-		ApplyPtermTheme()
+		ApplyPtermTheme(0)
 	}
 
 	// Create a new slog logger with the handler
@@ -114,4 +82,42 @@ func Success(msg string, keysAndValues ...interface{}) {
 
 func init() {
 	Initialize(viper.GetString("LOG_LEVEL"), false)
+}
+
+// ApplyPtermTheme applies custom styles to pterm
+func ApplyPtermTheme(indent int) {
+	// Customize INFO prefix
+
+	indentLevel := strings.Repeat(" ", indent)
+
+	pterm.Info.Prefix = pterm.Prefix{
+		Text:  fmt.Sprintf("%sℹ", indentLevel),          // Custom prefix text
+		Style: pterm.NewStyle(pterm.FgCyan, pterm.Bold), // Cyan + Bold
+	}
+
+	// Customize WARNING prefix
+	pterm.Warning.Prefix = pterm.Prefix{
+		Text:  fmt.Sprintf(`%s⚠`, indentLevel),
+		Style: pterm.NewStyle(pterm.FgYellow, pterm.Bold),
+	}
+
+	// Customize SUCCESS prefix
+	pterm.Success.Prefix = pterm.Prefix{
+		//Text: "",
+		//Style: nil,
+		Text:  fmt.Sprintf("%s✔", indentLevel),
+		Style: pterm.NewStyle(pterm.FgLightGreen, pterm.Bold),
+	}
+
+	// Customize ERROR prefix
+	pterm.Error.Prefix = pterm.Prefix{
+		Text:  fmt.Sprintf("%s⨯", indentLevel),
+		Style: pterm.NewStyle(pterm.FgRed, pterm.Bold),
+	}
+
+	// Customize DEBUG prefix (no timestamp)
+	pterm.Debug.Prefix = pterm.Prefix{
+		Text:  fmt.Sprintf("%s⚙︎", indentLevel),
+		Style: pterm.NewStyle(pterm.FgMagenta), // Magenta text for debug
+	}
 }

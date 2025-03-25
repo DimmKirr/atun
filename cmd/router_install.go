@@ -124,8 +124,8 @@ Example:
 
 			configJSON, err := json.Marshal(hostConfig)
 			if err != nil {
-				installSpinner.Fail(fmt.Sprintf("Failed to marshal host config: %v", err))
-				return fmt.Errorf("failed to marshal host config: %w", err)
+				installSpinner.Fail(fmt.Sprintf("Failed to marshal endpoints config: %v", err))
+				return fmt.Errorf("failed to marshal endpoints config: %w", err)
 			}
 
 			tags = append(tags, &ec2.Tag{

@@ -46,14 +46,14 @@ func createStack(c *config.Config) {
 		Config:  c,
 	}
 
-	//hostConfigJSON, err := json.Marshal(Host{
+	//hostConfigJSON, err := json.Marshal(Endpoint{
 	//	Proto:  "ssm",
 	//	Remote: "22",
 	//	Local:  "10001",
 	//})
 	//
 	//if err != nil {
-	//	pterm.Error.Sprintf("Error marshalling host config: %v", err)
+	//	pterm.Error.Sprintf("Error marshalling endpoints config: %v", err)
 	//}
 	//
 	//tags := map[string]interface{}{
@@ -168,6 +168,17 @@ func createStack(c *config.Config) {
 
 // ApplyCDKTF performs the 'apply' of theCDKTF stack
 func ApplyCDKTF(c *config.Config) error {
+
+	if err := constraints.CheckConstraints(
+		constraints.WithSSMPlugin(),
+		constraints.WithAWSProfile(),
+		constraints.WithAWSRegion(),
+		constraints.WithENV(),
+		constraints.WithNodeJS(),
+	); err != nil {
+		logger.Fatal("Error checking constraints", "error", err)
+	}
+
 	logger.Debug("Applying CDKTF stack.", "profile", c.AWSProfile, "region", c.AWSRegion)
 
 	createStack(c)
@@ -192,7 +203,7 @@ func ApplyCDKTF(c *config.Config) error {
 	// Initialize Terraform
 	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -205,7 +216,7 @@ func ApplyCDKTF(c *config.Config) error {
 	logger.Debug("Running terraform apply", "cmd", cmd)
 	cmd.Dir = synthDir
 	// Only show Terraform if LogPlainText is enabled (EndUser doesn't need to see Terraform output)
-	if c.LogPlainText && (c.LogLevel == "info" || c.LogLevel == "debug") {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -235,7 +246,7 @@ func DestroyCDKTF(c *config.Config) error {
 	// Initialize Terraform
 	cmd := exec.Command(terraformPath, "init")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
@@ -246,7 +257,7 @@ func DestroyCDKTF(c *config.Config) error {
 	// Destroy Terraform
 	cmd = exec.Command(terraformPath, "destroy", "-auto-approve")
 	cmd.Dir = synthDir
-	if c.LogLevel == "info" || c.LogLevel == "debug" {
+	if c.LogPlainText {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
