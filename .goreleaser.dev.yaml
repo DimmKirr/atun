@@ -10,7 +10,7 @@ builds:
     goos:
       - linux
       - darwin
-#      - windows
+      - windows
     goarch:
       - amd64
       - arm64
@@ -36,7 +36,7 @@ checksum:
   name_template: "{{ .ProjectName }}-checksums.txt"
 
 brews:
-  - name: atun-dev
+  - name: atun
     repository:
       owner: AutomationD
       name: homebrew-tap
@@ -76,3 +76,41 @@ brews:
       system "#{bin}/atun version"
     install: |
       bin.install "atun"
+
+scoops:
+  - name: atun
+    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    directory: atun
+    use: archive
+    commit_author:
+      name: Dmitry Kireev
+      email: dmitry@atd.sh
+    homepage: "https://github.com/AutomationD/atun"
+    commit_msg_template: "{{ .ProjectName }} {{ .Tag }} update"
+    description: "Atun is a simple SSM/SSH tunnel manager"
+    license: Apache License 2.0
+    skip_upload: false
+    depends: ["python"]
+    repository:
+      owner: AutomationD
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+  - name: atun-dev
+    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    directory: atun-dev
+    use: archive
+    commit_author:
+      name: Dmitry Kireev
+      email: dmitry@atd.sh
+    commit_msg_template: "{{ .ProjectName }} {{ .Tag }} update"
+    description: "Atun is a simple SSM/SSH tunnel manager"
+    license: Apache License 2.0
+    skip_upload: false
+    depends: ["python"]
+    repository:
+      owner: AutomationD
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"

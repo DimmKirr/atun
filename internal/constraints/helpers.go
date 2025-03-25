@@ -37,8 +37,9 @@ func CheckCommand(command string, subcommand []string) (bool, string) {
 }
 
 const (
-	ssmLinuxUrl = "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/%s_%s/session-manager-plugin%s"
-	ssmMacOsUrl = "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac/sessionmanager-bundle.zip"
+	ssmLinuxUrl   = "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/%s_%s/session-manager-plugin%s"
+	ssmMacOsUrl   = "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac/sessionmanager-bundle.zip"
+	ssmWindowsUrl = "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/windows/SessionManagerPluginSetup.exe"
 )
 
 func downloadSSMAgentPlugin() error {
@@ -51,7 +52,7 @@ func downloadSSMAgentPlugin() error {
 			},
 		}
 
-		file, err := os.Create("session-manager-plugin.deb")
+		file, err := os.Create("session-manager-plugin.zip")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -135,6 +136,33 @@ func downloadSSMAgentPlugin() error {
 				return err
 			}
 		}
+	case "windows":
+		client := http.Client{
+			CheckRedirect: func(r *http.Request, via []*http.Request) error {
+				r.URL.Opaque = r.URL.Path
+				return nil
+			},
+		}
+
+		file, err := os.Create("SessionManagerPluginSetup.exe")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		resp, err := client.Get(ssmWindowsUrl)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer resp.Body.Close()
+
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			return err
+		}
+
+		defer file.Close()
+
 	default:
 		return fmt.Errorf("unable to install automatically")
 	}
@@ -147,6 +175,8 @@ func cleanupSSMAgent() error {
 
 	if runtime.GOOS == "darwin" {
 		command = []string{"rm", "-f", "sessionmanager-bundle sessionmanager-bundle.zip"}
+	} else if runtime.GOOS == "windows" {
+		command = []string{"del", "/f", "SessionManagerPluginSetup.exe"}
 	} else if runtime.GOOS == "linux" {
 		distroName, err := GetOSRelease("/etc/os-release")
 		if err != nil {
@@ -173,9 +203,12 @@ func cleanupSSMAgent() error {
 func installSSMAgent() error {
 	command := []string{}
 
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		command = []string{"sudo", "./sessionmanager-bundle/install", "-i /usr/local/sessionmanagerplugin", "-b", "/usr/local/bin/session-manager-plugin"}
-	} else if runtime.GOOS == "linux" {
+	case "windows":
+		command = []string{"SessionManagerPluginSetup.exe", "/q"}
+	case "linux":
 		command = []string{"sudo", "yum", "install", "-y", "-q", "session-manager-plugin.deb"}
 
 		distroName, err := GetOSRelease("/etc/os-release")
@@ -190,7 +223,8 @@ func installSSMAgent() error {
 		case "rhel":
 			command = []string{"sudo", "yum", "install", "session-manager-plugin.rpm"}
 		}
-	} else {
+
+	default:
 		return fmt.Errorf("automatic installation of SSM Agent for your OS is not supported")
 	}
 

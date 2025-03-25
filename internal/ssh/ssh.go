@@ -20,7 +20,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // TODO: Refactor GetSSHCommandArgs into separate functions
@@ -264,9 +263,8 @@ func StartSSHTunnel(app *config.Atun) error {
 	os.Setenv("AWS_PROFILE", app.Config.AWSProfile)
 
 	// Detach the process (platform-dependent)
-	c.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Detach process from the parent group
-	}
+	// Platform-specific implementation is in sysproc_*.go files
+	setupSysProcAttr(c)
 
 	//// Stream stdout and stderr
 	//if app.Config.LogLevel == "debug" {
