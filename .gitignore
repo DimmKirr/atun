@@ -2,7 +2,7 @@
 *-debug.log
 *-error.log
 bin/
-demo/
+
 cdktf.out/
 dist/
 coverage.out
