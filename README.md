@@ -19,8 +19,7 @@ brew tap automationd/tap
 brew install atun
 ```
 
-
-<script src="https://asciinema.org/a/TPOK0zuNi9Vc76DtM1Nrurs3r.js" id="asciicast-TPOK0zuNi9Vc76DtM1Nrurs3r" async="true"></script>
+![Demo](./demo.svg)
 
 ## Features
 
