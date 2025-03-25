@@ -40,7 +40,9 @@ func GetSession(sessionConfig *SessionConfig) (*session.Session, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get home directory: %w", err)
 		}
-		credFilePath = path.Join(homeDir, ".aws/credentials")
+		credFilePath = path.Join(
+			homeDir, ".aws", "credentials",
+		)
 	}
 
 	// Get region from the credentials file if it's not set

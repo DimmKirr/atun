@@ -1,9 +1,9 @@
 # Atun - AWS Tagged Tunnel
 [![E2E Tests](https://github.com/automationd/atun/actions/workflows/tests.yml/badge.svg)](https://github.com/AutomationD/atun/actions/workflows/tests.yml)
 
-SSH tunnel cli tool that works without local configuration. It uses EC2 tags to define hosts and ports forwarding
-configuration.
-`atun.io/` [schema namespace](#tag-metadata-schema) can be used to configure an SSM tunnel.
+Secure tunneling doesn't have to be hard or annoying: `atun` is a tiny cli tool which works based on remote configuration. 
+It uses tags to define hosts and ports forwarding endpoints. `atun.io/` [schema namespace](#tag-metadata-schema) is used to easily configure endpoints.
+
 ## Demo
 ### `atun up`
 ![up](demo/up.cast.svg)
@@ -14,9 +14,8 @@ configuration.
 
 ![img.png](img.png)
 
-## WIP
 > [!NOTE]  
-> This tool is still in development and versions before 1.0.0 might have breaking changes.
+> While the tool works, it is still in development and versions before 1.0.0 might have breaking changes.
 Be ready that commits might be squashed/reset and tags might be rewritten until 1.0.0
 
 
@@ -28,12 +27,12 @@ brew install atun
 ```
 
 ## Features
-
-This tool allows to connect to private resources (RDS, Redis, etc) via EC2 router hosts without public IP (via SSM).
-At the moment there are only three commands available: `up`, `down`, and `status`.
+This tool allows to connect to private resources (RDS, Redis, etc) via routers.
+### EC2 Router
+This is the only router type available at the moment. It uses EC2 instances with `atun.io` schema tags to forward ports to the local machine.
+It doesn't require a public IP, since it uses SSM.
 
 ## Tag Metadata Schema
-
 In order for the tool to work your EC2 host must emply correct tag [schema](schemas/schema.json).
 At the moment it has two types of tags: Atun Version and Atun Host.
 
@@ -51,7 +50,6 @@ At the moment it has two types of tags: Atun Version and Atun Host.
 - remote: port that is available on the internal network to the router host.
 
 ### Example
-
 | AWS Tag                                                                        | Value                                           | Description                                                               |
 |--------------------------------------------------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------|
 | `atun.io/version`                                                              | `1`                                             | Schema Version. It might change if significant changes would be intoduced |
