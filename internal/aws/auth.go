@@ -251,5 +251,5 @@ func GetMFASharedCredentialsPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path.Join(homeDir, ".aws/credentials-mfa"), nil
+	return path.Join(homeDir, ".aws", "credentials-mfa"), nil
 }
