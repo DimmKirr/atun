@@ -1,11 +1,12 @@
 export default {
+  ignoreDeadLinks: process.env.NODE_ENV === 'development',
   title: "Atun",
   description: "AWS Tagged Tunnel - Secure tunneling made simple",
   themeConfig: {
     logo: '/logo.png',
     nav: [
       { text: 'Guide', link: '/guide/' },
-      { text: 'Reference', link: '/reference/' },
+      // { text: 'Reference', link: '/reference/' },
       { text: 'GitHub', link: 'https://github.com/automationd/atun' }
     ],
     sidebar: [
@@ -14,7 +15,6 @@ export default {
         items: [
           { text: 'Introduction', link: '/guide/' },
           { text: 'Quick Start', link: '/guide/quickstart' },
-          { text: 'Installation', link: '/guide/installation' }
         ]
       },
       {
@@ -28,7 +28,6 @@ export default {
         text: 'Reference',
         items: [
           { text: 'CLI Commands', link: '/reference/cli-commands' },
-          { text: 'Configuration', link: '/reference/configuration' }
         ]
       }
     ],

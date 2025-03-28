@@ -6,10 +6,10 @@ It uses tags to define hosts and ports forwarding endpoints. `atun.io/` [schema 
 
 ## Demo
 ### `atun up`
-![up](demo/up.cast.svg)
+![up](website/docs/demo/up.cast.svg)
 
 ### `atun down`
-![down](demo/down.cast.svg)
+![down](website/docs/demo/down.cast.svg)
 
 
 ![img.png](img.png)
