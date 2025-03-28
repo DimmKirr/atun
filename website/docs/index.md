@@ -16,4 +16,16 @@ Be ready that commits might be squashed/reset and tags might be rewritten until 
 - **Simple CLI Interface**: Intuitive commands for managing tunnels
 - **Cross-Platform**: Available for both macOS and Windows
 
+## Quick Demo
+
+### Starting a Tunnel
+Watch how easy it is to start a tunnel with Atun:
+
+![Starting a Tunnel with Atun](./demo/up.cast.svg)
+
+### Closing a Tunnel
+And when you're done, closing it is just as simple:
+
+![Closing a Tunnel with Atun](./demo/down.cast.svg)
+
 [Get Started →](/guide/)
