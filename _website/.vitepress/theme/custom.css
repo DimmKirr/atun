@@ -1,0 +1,11 @@
+:root {
+    /* accent color for headings, links, buttons */
+    --vp-c-brand: #fffff; /* <-- replace with your custom color */
+    --vp-c-brand-light: #8de0b3;
+    --vp-c-brand-dark: #4db87d;
+
+    /* button color */
+    --vp-button-brand-bg: var(--vp-c-brand);
+    --vp-button-brand-hover-bg: var(--vp-c-brand-dark);
+    --vp-button-brand-active-bg: var(--vp-c-brand-light);
+}

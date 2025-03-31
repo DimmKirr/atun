@@ -6,7 +6,7 @@ on:
       - main
       - feature/wip
     paths:
-      - 'website/**'
+      - '../../_website/**'
   workflow_dispatch:
 
 permissions:

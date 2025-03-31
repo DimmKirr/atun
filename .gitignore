@@ -7,7 +7,3 @@ cdktf.out/
 dist/
 coverage.out
 atun.toml
-
-# Website / Docs
-node_modules/
-.vitepress/cache
