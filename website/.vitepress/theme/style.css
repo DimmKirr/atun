@@ -43,16 +43,64 @@
  *   in custom container, badges, etc.
  * -------------------------------------------------------------------------- */
 
-:root {
-  --vp-c-default-1: var(--vp-c-gray-1);
-  --vp-c-default-2: var(--vp-c-gray-2);
-  --vp-c-default-3: var(--vp-c-gray-3);
-  --vp-c-default-soft: var(--vp-c-gray-soft);
+/**
+ * Customize default theme styling by overriding CSS variables:
+ * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
+ */
 
-  --vp-c-brand-1: var(--vp-c-indigo-1);
-  --vp-c-brand-2: var(--vp-c-indigo-2);
-  --vp-c-brand-3: var(--vp-c-indigo-3);
-  --vp-c-brand-soft: var(--vp-c-indigo-soft);
+/* ==========================================================================
+   Custom Color Tokens (Neo-Brutalist)
+   ========================================================================== */
+
+:root {
+  /* orig */
+  /*--color-bg: #009dff;*/
+  /*--color-highlight: #a1d99b;*/
+  /*--color-text: #000000;*/
+  /*--color-bg-2: #ffffff;*/
+
+  /*Sea & Lime*/
+  /*--color-bg: #009DFF;       !* Strong, flat blue *!*/
+  /*--color-highlight: #C4E538; !* Neo-brutalist lime green *!*/
+  /*--color-text: #000000;      !* Pure black *!*/
+  /*--color-bg-2: #ffffff;      !* Pure white *!*/
+
+
+
+  /*Tuna & Coral*/
+  /*--color-bg: #009DFF;       !* Sea blue *!*/
+  /*--color-highlight: #FF6B6B; !* Strong coral (red-orange) *!*/
+  /*--color-text: #000000;      !* Pure black *!*/
+  /*--color-bg-2: #ffffff;      !* Pure white *!*/
+
+
+  /*Deep Ocean*/
+  /*--color-bg: #005F99;        !* Deep ocean blue *!*/
+  /*--color-highlight: #FFD43B; !* Brutalist yellow *!*/
+  /*--color-text: #000000;      !* Pure black *!*/
+  /*--color-bg-2: #ffffff;      !* Pure white *!*/
+
+  /*Tuna & Mint*/
+  --color-bg: #009DFF;       /* Sea blue */
+  --color-highlight: #ffac00; /* Neo-brutalist mint (fresh, flat, very poster-like) */
+  --color-text: #000000;      /* Pure black */
+  --color-bg-2: #ffffff;      /* Pure white */
+}
+
+/* ==========================================================================
+   VitePress Required Tokens
+   ========================================================================== */
+
+:root {
+  --vp-c-default-1: var(--color-text);
+  --vp-c-default-2: var(--color-text);
+  --vp-c-default-3: var(--color-text);
+  --vp-c-default-soft: rgba(0, 0, 0, 0.05);
+
+  --vp-c-brand-1: var(--color-highlight);
+  --vp-c-brand-2: var(--color-highlight);
+  --vp-c-brand-3: var(--color-highlight);
+  --vp-c-brand-soft: rgba(161, 217, 155, 0.2);
 
   --vp-c-tip-1: var(--vp-c-brand-1);
   --vp-c-tip-2: var(--vp-c-brand-2);
@@ -68,59 +116,55 @@
   --vp-c-danger-2: var(--vp-c-red-2);
   --vp-c-danger-3: var(--vp-c-red-3);
   --vp-c-danger-soft: var(--vp-c-red-soft);
+
+  --vp-c-text-1: var(--color-text);
+  --vp-c-text-2: var(--color-text);
+  --vp-c-text-3: var(--color-text);
 }
 
-/**
- * Component: Button
- * -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Component: Button
+   ========================================================================== */
 
 :root {
-  --vp-button-brand-border: transparent;
-  --vp-button-brand-text: var(--vp-c-white);
-  --vp-button-brand-bg: var(--vp-c-brand-3);
-  --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-hover-text: var(--vp-c-white);
-  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
-  --vp-button-brand-active-border: transparent;
-  --vp-button-brand-active-text: var(--vp-c-white);
-  --vp-button-brand-active-bg: var(--vp-c-brand-1);
+  /*--vp-button-brand-border: var(--color-text);*/
+  /*--vp-button-brand-text: var(--color-text);*/
+  /*--vp-button-brand-bg: var(--vp-c-brand-3);*/
+  /*--vp-button-brand-hover-border: var(--color-text);*/
+  /*--vp-button-brand-hover-text: var(--color-text);*/
+  /*--vp-button-brand-hover-bg: var(--vp-c-brand-2);*/
+  /*--vp-button-brand-active-border: var(--color-text);*/
+  /*--vp-button-brand-active-text: var(--color-text);*/
+  /*--vp-button-brand-active-bg: var(--vp-c-brand-1);*/
 }
 
-/**
- * Component: Home
- * -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Component: Home
+   ========================================================================== */
 
 :root {
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(
-    120deg,
-    #bd34fe 30%,
-    #41d1ff
-  );
+  --vp-home-hero-name-color: var(--vp-c-brand-2);
+  --vp-home-hero-name-background: none;
 
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #bd34fe 50%,
-    #47caff 50%
-  );
-  --vp-home-hero-image-filter: blur(44px);
+  --vp-home-hero-image-background-image: none;
+  --vp-home-hero-image-filter: none;
 }
 
 @media (min-width: 640px) {
   :root {
-    --vp-home-hero-image-filter: blur(56px);
+    --vp-home-hero-image-filter: none;
   }
 }
 
 @media (min-width: 960px) {
   :root {
-    --vp-home-hero-image-filter: blur(68px);
+    --vp-home-hero-image-filter: none;
   }
 }
 
-/**
- * Component: Custom Block
- * -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Component: Custom Block
+   ========================================================================== */
 
 :root {
   --vp-custom-block-tip-border: transparent;
@@ -129,11 +173,248 @@
   --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
 }
 
-/**
- * Component: Algolia
- * -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Component: Algolia
+   ========================================================================== */
 
 .DocSearch {
   --docsearch-primary-color: var(--vp-c-brand-1) !important;
+}
+
+/* ==========================================================================
+   Component: VPFeature (Feature Blocks)
+   ========================================================================== */
+
+.VPLink.no-icon {
+  background: var(--color-bg-2);
+  border: 2px solid var(--color-text);
+
+  border-radius: 6px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 1);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.VPLink.no-icon:hover {
+  background: var(--color-bg-2);
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 1);
+}
+
+.VPLink.no-icon:active {
+  transform: translate(0, 0);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 1);
+}
+
+.VPLink.no-icon h2,
+.VPLink.no-icon h3 {
+  color: var(--color-text);
+}
+
+.VPLink.no-icon p {
+  color: var(--color-text);
+  opacity: 0.8;
+}
+
+/* ==========================================================================
+   Buttons (Primary + Secondary)
+   ========================================================================== */
+
+/* Brand Button (Quickstart) */
+.VPButton.medium.brand {
+  background: var(--color-highlight);                /* Brutalist mint */
+  border: 2px solid var(--color-text);              /* Strong black border */
+  border-radius: 6px;                  /* Slight rounding */
+  color: var(--color-text);                         /* Black text */
+  box-shadow: 4px 4px 0 #000;          /* Hard shadow */
+  padding: 1rem 2rem;                  /* Bigger button */
+  font-size: 1.5rem;                   /* Large text */
+  font-weight: 600;                    /* Medium-heavy */
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-align: center;
+}
+
+.VPButton.medium.brand:hover {
+  background: var(--color-highlight);                /* Brutalist mint */
+  border: 2px solid var(--color-text);              /* Strong black border */
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
+  padding: 1rem 2rem;                  /* Bigger button */
+  color: var(--color-text);                         /* Black text */
+}
+
+.VPButton.medium.brand:active {
+  transform: translate(0, 0);
+  box-shadow: none;
+}
+
+/* Alt Button (View on GitHub) */
+.VPButton.medium.alt {
+  background: var(--color-bg-2);      /* White */
+  border: 2px solid var(--color-text);             /* Strong black border */
+  border-radius: 6px;                 /* Slightly rounded */
+  color: var(--color-text);
+  box-shadow: 4px 4px 0 var(--color-text);         /* Hard shadow */
+  padding: 1rem 2rem;                 /* Bigger size */
+  font-size: 1.5rem;                  /* Large text */
+  font-weight: 600;                   /* Medium-heavy */
+  transition: transform 0.1s, box-shadow 0.1s;
+  text-align: center;
+}
+
+.VPButton.medium.alt:hover {
+  background: var(--color-bg-2);      /* White */
+  border: 2px solid var(--color-text);             /* Strong black border */
+  border-radius: 6px;                 /* Slightly rounded */
+  color: var(--color-text);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--color-text);
+}
+
+.VPButton.medium.alt:active {
+  transform: translate(0, 0);
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   Terminal Image (VPImage)
+   ========================================================================== */
+
+.VPHero .image-src {
+  position: relative !important;
+
+  max-width: 95%;
+  max-height: none;
+
+  left: 2.9rem !important;
+  top: 2.5rem !important;
+
+  transform: none !important;
+}
+
+/* On small screens (tablet) - stack below */
+@media (max-width: 960px) {
+
+  .VPHero .image {
+    margin: auto auto 0 auto;
+    order: 2;
+  }
+
+
+}
+
+/* On small screens (tablet) - stack below */
+/*@media (min-width: 634px) {*/
+/*  .image-container[data-v-72cc4481] {*/
+/*    width: 80% !important;*/
+/*    height: auto !important;*/
+/*  }*/
+/*}*/
+
+/*@media (min-width: 660px) {*/
+/*  .image-container[data-v-72cc4481] {*/
+/*    width: 80% !important;*/
+/*    height: auto !important;*/
+/*  }*/
+/*}*/
+
+.VPHero .image-container {
+  aspect-ratio: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+/*.VPHero .image {*/
+/*  margin-left: auto;*/
+/*  padding-right: 2rem; !* optional tweak *!*/
+/*}*/
+
+/*.VPHero .text {*/
+/*  font-size: 90px;*/
+/*  line-height: 0.85;*/
+/*}*/
+
+/* ==========================================================================
+   Component: VPFooter
+   ========================================================================== */
+
+.VPFooter {
+  border-top: none !important;
+}
+
+.VPFooter {
+  background: #000 !important;
+  color: #fff;
+  width: 100%;
+}
+
+.VPFooter .container {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.VPFooter .message,
+.VPFooter .copyright {
+  color: #fff;
+}
+
+
+/* ==========================================================================
+   Component: Not Found
+   ========================================================================== */
+
+.NotFound .link {
+  background: var(--color-bg-2);
+  border: 2px solid var(--color-text);
+  border-radius: 6px;
+  color: var(--color-text);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 1);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.NotFound .link:hover {
+  color: var(--color-text);
+  background: var(--color-bg-2);
+  border: 2px solid var(--color-text);
+  border-radius: 6px;
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 1);
+}
+
+.NotFound .link:active {
+  transform: translate(0, 0);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 1);
+  /*box-shadow: 3px 3px 0 rgba(0, 0, 0, 1);*/
+}
+
+
+/* ==========================================================================
+   Component: VPContent
+   ========================================================================== */
+
+.VPContent {
+  background-color: var(--color-bg);
+}
+
+/* Default for all pages */
+.VPContent:not(.is-home) .VPNav {
+  background-color: var(--color-bg-2); /* white */
+}
+
+
+.VPContent.has-sidebar {
+  background-color: var(--color-bg-2); /* white */
+}
+
+.VPNavBar.has-sidebar.top {
+  background-color: var(--color-bg-2) !important; /* white */
+}
+
+.VPLocalNav.has-sidebar {
+    background-color: var(--color-bg-2); /* white */
+}
+
+
+:root {
+  --vp-c-bg: var(--color-bg-2);
 }
 
