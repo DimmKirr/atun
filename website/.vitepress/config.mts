@@ -1,14 +1,28 @@
-export default {
-  ignoreDeadLinks: process.env.NODE_ENV === 'development',
+import { defineConfig } from 'vitepress'
+
+// https://vitepress.dev/reference/site-config
+export default defineConfig({
   title: "Atun",
-  description: "AWS Tagged Tunnel - Secure tunneling made simple",
+  description: "Seamless, IAM-native access to private RDS, Elasticache, DynamoDB, and more. No VPNs, no SSH agents, no friction.",
+  srcDir: 'src',
+  // head: [
+  //   ['style', {}, `
+  //     :root {
+  //       --vp-c-bg: #009DFF !important;
+  //     }
+  //   `]
+  // ],
   themeConfig: {
-    logo: '/logo.png',
+    // https://vitepress.dev/reference/default-theme-config
+    appearance: false,
+    search: {
+      provider: 'local'
+    },
     nav: [
-      { text: 'Guide', link: '/guide/' },
-      // { text: 'Reference', link: '/reference/' },
-      { text: 'GitHub', link: 'https://github.com/automationd/atun' }
+      // { text: 'Home', link: '/' },
+      // { text: 'Examples', link: '/markdown-examples' }
     ],
+
     sidebar: [
       {
         text: 'Getting Started',
@@ -31,12 +45,14 @@ export default {
         ]
       }
     ],
+
     socialLinks: [
       { icon: 'github', link: 'https://github.com/automationd/atun' }
     ],
+
     footer: {
       message: 'Released under Apache 2.0 License.',
-      copyright: '© 2025 Atun Contributors'
+      copyright: 'Copyright © 2025 Dmitry Kireev'
     }
   }
-}
+})

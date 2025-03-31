@@ -1,15 +1,15 @@
 # Atun - AWS Tagged Tunnel
 [![E2E Tests](https://github.com/automationd/atun/actions/workflows/tests.yml/badge.svg)](https://github.com/AutomationD/atun/actions/workflows/tests.yml)
 
-Secure tunneling doesn't have to be hard or annoying: `atun` is a tiny cli tool which works based on remote configuration. 
+``Secure tunneling doesn't have to be hard or annoying: `atun` is a tiny cli tool which works based on remote configuration. 
 It uses tags to define hosts and ports forwarding endpoints. `atun.io/` [schema namespace](#tag-metadata-schema) is used to easily configure endpoints.
-
+``
 ## Demo
 ### `atun up`
-![up](website/docs/demo/up.cast.svg)
+![up](_website/docs/demo/up.cast.svg)
 
 ### `atun down`
-![down](website/docs/demo/down.cast.svg)
+![down](_website/docs/demo/down.cast.svg)
 
 
 ![img.png](img.png)
