@@ -6,7 +6,7 @@ on:
       - main
       - feature/wip
     paths:
-      - '../../_website/**'
+      - '../../website/**'
   workflow_dispatch:
 
 permissions:
@@ -40,13 +40,15 @@ jobs:
         working-directory: website
 
       - name: Build
-        run: npm run docs:build
+        run: |
+          npm run docs:build
+
         working-directory: website
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website/docs/.vitepress/dist
+          path: ${{ github.workspace }}/website/.vitepress/dist
 
   deploy:
     environment:

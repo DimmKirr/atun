@@ -10,7 +10,7 @@ hero:
   icon: 🐟️
   image:
 #    src: ./logo.png
-    src: ./demo/up.hero.svg
+    src: /up.hero.svg
     alt: Banner
 ##    width: 750
 #    height: 435
