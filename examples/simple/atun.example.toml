@@ -4,17 +4,28 @@
 aws_region="us-east-1"
 router_subnet_id="subnet-xxxxxxxxxxxxxxxx"
 
+#[[hosts]]
+#name = "ipconfig.io"
+#proto = "ssm"
+#remote = 80
+#local = 10080
+#
+#[[hosts]]
+#name = "icanhazip.com"
+#proto = "ssm"
+#remote = 80
+#local = 10081
 [[hosts]]
-name = "ipconfig.io"
+name = "db.cluster-abcdef000000.us-east-1.rds.amazonaws.com"
 proto = "ssm"
-remote = 80
-local = 10080
+remote = 5432
+local = 15432
 
 [[hosts]]
-name = "icanhazip.com"
+name = "elasticsearch-abcdef000000.us-east-1.es.amazonaws.com"
 proto = "ssm"
-remote = 80
-local = 10081
+remote = 443
+local = 10443
 
 #[[hosts]]
 #name = "target-vpc-host-3"

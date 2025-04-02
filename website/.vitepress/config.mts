@@ -4,7 +4,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Atun",
   description: "Seamless, IAM-native access to private RDS, Elasticache, DynamoDB, and more. No VPNs, no SSH agents, no friction.",
-  srcDir: 'src',
+  srcDir: 'docs',
   // head: [
   //   ['style', {}, `
   //     :root {
@@ -12,9 +12,10 @@ export default defineConfig({
   //     }
   //   `]
   // ],
+  appearance: false,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
-    appearance: false,
+
     search: {
       provider: 'local'
     },
