@@ -32,13 +32,6 @@ atun status
 atun down
 ```
 
-### Create Adhoc Router
->[!NOTE]
-> If you have a DevOps team or the infrastructure is managed by IaC (Terraform/Cloudformation), this command is likely not necessary. Just use [atun up](/reference/cli-commands/up) to start a tunnel.
-```bash
-atun router create
-```
-
 ## Next Steps
 
 - Learn about [EC2 Router](/guide/ec2-router)
