@@ -61,7 +61,6 @@ jobs:
           GIT_SHA: ${{ env.SHORT_SHA }}
           GITHUB_ACTOR: ${{ github.actor }}
 
-
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

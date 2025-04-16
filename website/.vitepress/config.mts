@@ -12,6 +12,12 @@ export default defineConfig({
   //     }
   //   `]
   // ],
+  rewrites: {
+    'release/:version': {
+      replace: (match: { version: string }) =>
+          `https://github.com/AutomationD/atun/releases/tag/${match.version}`
+    }
+  },
   appearance: false,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
