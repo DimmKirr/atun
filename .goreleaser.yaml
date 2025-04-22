@@ -80,38 +80,3 @@ brews:
       system "#{bin}/atun version"
     install: |
       bin.install "atun"
-
-scoops:
-  - name: atun
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    commit_author:
-      name: Dmitry Kireev
-      email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
-    commit_msg_template: "{{ .ProjectName }} {{ .Tag }} update"
-    description: "Atun is a simple SSM/SSH tunnel manager"
-    license: Apache License 2.0
-    skip_upload: false
-    depends: ["python"]
-    repository:
-      owner: AutomationD
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-
-  - name: atun@{{ .Version }}
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    commit_author:
-      name: Dmitry Kireev
-      email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
-    commit_msg_template: "{{ .ProjectName }} {{ .Tag }} update"
-    description: "Atun is a simple SSM/SSH tunnel manager"
-    license: Apache License 2.0
-    skip_upload: false
-    depends: ["python"]
-    repository:
-      owner: AutomationD
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"

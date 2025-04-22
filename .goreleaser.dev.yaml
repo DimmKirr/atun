@@ -3,7 +3,7 @@ version: 2
 project_name: atun
 
 builds:
-  - id: atun
+  - id: build-glibc
     main: ./main.go
     env:
       - CGO_ENABLED=0
@@ -17,9 +17,34 @@ builds:
     ldflags:
       - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
 
+  - id: build-musl
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    tags:
+      - musl
+    ldflags:
+      - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
+
 archives:
-  - id: release_archive
+  - id: archive-glibc
+    ids:
+      - build-glibc
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+  - id: archive-musl
+    ids:
+      - build-musl
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}-musl"
     files:
       - LICENSE
       - README.md
@@ -37,11 +62,12 @@ checksum:
 
 brews:
   - name: atun-dev
+    ids:
+      - archive-glibc
     repository:
       owner: AutomationD
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-
     directory: Formula
     url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
@@ -59,11 +85,12 @@ brews:
       bin.install "atun"
 
   - name: atun-dev@{{ .Version }}
+    ids:
+      - archive-glibc
     repository:
       owner: AutomationD
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-
     directory: Formula
     url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
@@ -72,6 +99,9 @@ brews:
     homepage: "https://github.com/AutomationD/atun"
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
+    conflicts:
+      - atun
+      - atun@{{ .Version }}
     test: |
       system "#{bin}/atun version"
     install: |
@@ -109,3 +139,48 @@ scoops:
       name: scoop-bucket
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+nfpms:
+  - id: nfpm-musl
+    package_name: atun
+    file_name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-musl"
+    ids:
+      - build-musl
+    formats:
+      - apk
+    vendor: Dmitry Kireev
+    homepage: https://atun.io
+    maintainer: Dmitry Kireev <dmitry@atd.sh>
+    description: atun.io is a simple SSM/SSH tunnel manager
+    license: Apache 2.0
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/atun/LICENSE
+      - src: ./README.md
+        dst: /usr/share/doc/atun/README.md
+
+  - id: nfpm-glibc
+    ids:
+      - build-glibc
+    package_name: atun
+    file_name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    vendor: AutomationD
+    homepage: https://github.com/AutomationD/atun
+    maintainer: Dmitry Kireev <dmitry@atd.sh>
+    description: atun.io is a simple SSM/SSH tunnel manager
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+
+publishers:
+  - name: fury.io
+    # by specifying `packages` id here goreleaser will only use this publisher
+    # with artifacts identified by this id
+    ids:
+      - nfpm-musl
+    dir: "{{ dir .ArtifactPath }}"
+    cmd: |
+      fury push {{ .ArtifactName }} --public --account automationd --api-token {{ .Env.FURY_TOKEN }}
+#    cmd: curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/automationd/
+
