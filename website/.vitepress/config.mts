@@ -4,20 +4,10 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Atun",
   description: "Seamless, IAM-native access to private RDS, Elasticache, DynamoDB, and more. No VPNs, no SSH agents, no friction.",
+
+  // Site configuration
   srcDir: 'docs',
-  // head: [
-  //   ['style', {}, `
-  //     :root {
-  //       --vp-c-bg: #009DFF !important;
-  //     }
-  //   `]
-  // ],
-  rewrites: {
-    'release/:version': {
-      replace: (match: { version: string }) =>
-          `https://github.com/AutomationD/atun/releases/tag/${match.version}`
-    }
-  },
+
   appearance: false,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
