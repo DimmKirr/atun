@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pterm/pterm"
 	"github.com/spf13/viper"

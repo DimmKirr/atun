@@ -8,8 +8,8 @@ package constraints
 import (
 	"errors"
 	"fmt"
+	"github.com/DimmKirr/atun/internal/config"
 	"github.com/Masterminds/semver"
-	"github.com/automationd/atun/internal/config"
 	"github.com/pterm/pterm"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"

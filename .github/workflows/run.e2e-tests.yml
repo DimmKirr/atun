@@ -32,10 +32,10 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Go
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.23.8 # Until https://github.com/golang/go/issues/73617 is fixed
 
       - name: Checkout Code
         uses: actions/checkout@v4

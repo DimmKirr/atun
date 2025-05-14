@@ -7,11 +7,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/aws"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/infra"
-	"github.com/automationd/atun/internal/logger"
-	"github.com/automationd/atun/internal/ux"
+	"github.com/DimmKirr/atun/internal/aws"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/infra"
+	"github.com/DimmKirr/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/ux"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

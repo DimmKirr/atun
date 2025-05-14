@@ -32,6 +32,8 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.8 # Until https://github.com/golang/go/issues/73617 is fixed
 
       - name: Set env
         run: |
@@ -54,8 +56,8 @@ jobs:
           export VERSION="${RELEASE_VERSION#v}"
           echo "version: ${VERSION}"
 
-          echo "fury cli: fury --account automationd --api-token ${FURY_API_TOKEN} yank "atun@${VERSION}" --force"
-          fury --account automationd --api-token ${FURY_API_TOKEN} yank "atun@${VERSION}" --force || echo "Version ${VERSION} not found in a fury repo."
+          echo "fury cli: fury --account DimmKirr --api-token ${FURY_API_TOKEN} yank "atun@${VERSION}" --force"
+          fury --account DimmKirr --api-token ${FURY_API_TOKEN} yank "atun@${VERSION}" --force || echo "Version ${VERSION} not found in a fury repo."
 
       - name: Add tag
         run: |

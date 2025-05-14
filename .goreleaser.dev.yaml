@@ -15,7 +15,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
+      - -s -w -X 'github.com/DimmKirr/atun/internal/version.Version={{.Version}}' -X 'github.com/DimmKirr/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
 
   - id: build-musl
     main: ./main.go
@@ -30,7 +30,7 @@ builds:
     tags:
       - musl
     ldflags:
-      - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
+      - -s -w -X 'github.com/DimmKirr/atun/internal/version.Version={{.Version}}' -X 'github.com/DimmKirr/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
 
 archives:
   - id: archive-glibc
@@ -51,7 +51,7 @@ archives:
 
 release:
   github:
-    owner: AutomationD
+    owner: DimmKirr
     name: atun
   draft: true
   replace_existing_draft: true
@@ -65,15 +65,15 @@ brews:
     ids:
       - archive-glibc
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
+    homepage: "https://github.com/DimmKirr/atun"
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
     conflicts:
@@ -88,15 +88,15 @@ brews:
     ids:
       - archive-glibc
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
+    homepage: "https://github.com/DimmKirr/atun"
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
     conflicts:
@@ -109,7 +109,7 @@ brews:
 
 scoops:
   - name: atun-dev
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
@@ -119,13 +119,13 @@ scoops:
     skip_upload: false
     depends: ["python"]
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: scoop-bucket
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
   - name: atun-dev@{{ .Version }}
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
@@ -135,7 +135,7 @@ scoops:
     skip_upload: false
     depends: ["python"]
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: scoop-bucket
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
@@ -164,8 +164,8 @@ nfpms:
       - build-glibc
     package_name: atun
     file_name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
-    vendor: AutomationD
-    homepage: https://github.com/AutomationD/atun
+    vendor: DimmKirr
+    homepage: https://github.com/DimmKirr/atun
     maintainer: Dmitry Kireev <dmitry@atd.sh>
     description: atun.io is a simple SSM/SSH tunnel manager
     license: Apache 2.0
@@ -181,6 +181,6 @@ publishers:
       - nfpm-musl
     dir: "{{ dir .ArtifactPath }}"
     cmd: |
-      fury push {{ .ArtifactName }} --public --account automationd --api-token {{ .Env.FURY_TOKEN }}
-#    cmd: curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/automationd/
+      fury push {{ .ArtifactName }} --public --account DimmKirr --api-token {{ .Env.FURY_TOKEN }}
+#    cmd: curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/DimmKirr/
 

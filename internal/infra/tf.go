@@ -15,8 +15,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/logger"
 )
 
 const (

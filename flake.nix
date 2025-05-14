@@ -1,5 +1,5 @@
 {
-  description = "A Nix flake for automationd/atun";
+  description = "A Nix flake for DimmKirr/atun";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

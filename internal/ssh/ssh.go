@@ -7,8 +7,8 @@ package ssh
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/shirou/gopsutil/v4/process"
 	ssh2 "golang.org/x/crypto/ssh"
 	"log"

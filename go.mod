@@ -1,4 +1,4 @@
-module github.com/automationd/atun
+module github.com/DimmKirr/atun
 
 go 1.23.1
 
@@ -10,7 +10,6 @@ require (
 	github.com/cdktf/cdktf-provider-aws-go/aws/v19 v19.23.0
 	github.com/docker/docker v27.1.1+incompatible
 	github.com/docker/go-connections v0.5.0
-	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/go-ini/ini v1.67.0
 	github.com/hashicorp/terraform-cdk-go/cdktf v0.20.7
 	github.com/pterm/pterm v0.12.80
@@ -45,8 +44,6 @@ require (
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/gdamore/tcell/v2 v2.8.1 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -59,7 +56,6 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
-	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20240226150601-1dcf7310316a // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

@@ -1,9 +1,11 @@
 # Atun - AWS Tagged Tunnel
-[![E2E Tests](https://github.com/automationd/atun/actions/workflows/run.e2e-tests.yml/badge.svg)](https://github.com/AutomationD/atun/actions/workflows/run.e2e-tests.yml)
+[![E2E Tests](https://github.com/DimmKirr/atun/actions/workflows/run.e2e-tests.yml/badge.svg)](https://github.com/DimmKirr/atun/actions/workflows/run.e2e-tests.yml)
+[![Release](https://img.shields.io/github/v/release/DimmKirr/atun)](https://github.com/DimmKirr/atun/releases/latest)
+[![License: Apache](https://img.shields.io/badge/License-Apache-yellow.svg)](./LICENSE)
 
-``Secure tunneling doesn't have to be hard or annoying: `atun` is a tiny cli tool which works based on remote configuration. 
+Secure tunneling doesn't have to be hard or annoying: `atun` is a tiny cli tool which works based on remote configuration. 
 It uses tags to define hosts and ports forwarding endpoints. `atun.io/` [schema namespace](#tag-metadata-schema) is used to easily configure endpoints.
-``
+
 ## Demo
 ### `atun up`
 ![up](website/docs/public/up.cast.svg)
@@ -22,13 +24,13 @@ Be ready that commits might be squashed/reset and tags might be rewritten until 
 ## Quickstart
 ### Install with Homebrew
 ```bash
-brew tap automationd/tap
+brew tap DimmKirr/tap
 brew install atun
 ```
 
 ### Install with Scoop
 ```PowerShell
-scoop bucket add automationd https://github.com/automationd/scoop-bucket.git
+scoop bucket add DimmKirr https://github.com/DimmKirr/scoop-bucket.git
 scoop install atun
 ```
 
@@ -120,7 +122,7 @@ atun down --delete
 ## Development & Contributing
 ### Install from Homebrew (dev version)
 ```bash
-brew tap automationd/tap
+brew tap DimmKirr/tap
 brew install atun --build-from-source
 ```
 If the dev version has cached old metadata (b/c version is the same), use this command:
