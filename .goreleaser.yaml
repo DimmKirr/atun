@@ -15,7 +15,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X 'github.com/automationd/atun/internal/version.Version={{.Version}}' -X 'github.com/automationd/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
+      - -s -w -X 'github.com/DimmKirr/atun/internal/version.Version={{.Version}}' -X 'github.com/DimmKirr/atun/internal/version.GitCommit={{.Env.SHORT_SHA}}'
 
 archives:
   - id: release_archive
@@ -26,7 +26,7 @@ archives:
 
 release:
   github:
-    owner: AutomationD
+    owner: DimmKirr
     name: atun
   draft: true
   replace_existing_draft: true
@@ -38,16 +38,16 @@ checksum:
 brews:
   - name: atun
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
+    homepage: "https://github.com/DimmKirr/atun"
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
     conflicts:
@@ -61,16 +61,16 @@ brews:
   # This build will be moved to a separate release build when things get stable
   - name: atun@{{ .Version }}
     repository:
-      owner: AutomationD
+      owner: DimmKirr
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     directory: Formula
-    url_template: "https://github.com/AutomationD/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/DimmKirr/atun/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: Dmitry Kireev
       email: dmitry@atd.sh
-    homepage: "https://github.com/AutomationD/atun"
+    homepage: "https://github.com/DimmKirr/atun"
     description: "atun.io is a simple SSM/SSH tunnel manager"
     license: "Apache 2.0"
     conflicts:

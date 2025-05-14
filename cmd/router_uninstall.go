@@ -13,11 +13,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/spf13/cobra"
 
-	awsLib "github.com/automationd/atun/internal/aws"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/constraints"
-	"github.com/automationd/atun/internal/logger"
-	"github.com/automationd/atun/internal/ux"
+	awsLib "github.com/DimmKirr/atun/internal/aws"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/constraints"
+	"github.com/DimmKirr/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/ux"
 )
 
 // routerUninstallCmd represents the router uninstall command

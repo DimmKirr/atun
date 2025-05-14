@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/constraints"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/constraints"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
 
-	//"github.com/automationd/atun/internal/config"
+	//"github.com/DimmKirr/atun/internal/config"
 	"os"
 
 	"github.com/spf13/cobra"

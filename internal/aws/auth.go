@@ -7,8 +7,8 @@ package aws
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"os"

@@ -7,10 +7,10 @@ package ux
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/aws"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/logger"
-	"github.com/automationd/atun/internal/ssh"
+	"github.com/DimmKirr/atun/internal/aws"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/ssh"
 	"github.com/pterm/pterm"
 	"io"
 	"os"

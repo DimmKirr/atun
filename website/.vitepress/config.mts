@@ -4,7 +4,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Atun",
   description: "Seamless, IAM-native access to private RDS, Elasticache, DynamoDB, and more. No VPNs, no SSH agents, no friction.",
-
+  head: [['link', { rel: 'icon', href: '/favicon.ico' }]],
   // Site configuration
   srcDir: 'docs',
 
@@ -44,7 +44,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/automationd/atun' }
+      { icon: 'github', link: 'https://github.com/DimmKirr/atun' }
     ],
 
     footer: {

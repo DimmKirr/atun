@@ -25,6 +25,8 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.8 # Until https://github.com/golang/go/issues/73617 is fixed
 
       - name: Set env
         run: |
@@ -47,6 +49,53 @@ jobs:
           FURY_TOKEN: ${{ secrets.FURY_PUSH_TOKEN }}
           GIT_SHA: ${{ env.SHORT_SHA }}
           GITHUB_ACTOR: ${{ github.actor }}
+
+
+      - name: Generate Banner
+        uses: DimmKirr/action-brutalease@v1
+        with:
+          version: ${{ github.event.release.tag_name }}
+          body: ${{ github.event.release.body }}
+          repo_url: ${{ github.repository }}
+          output: release-banner.png
+          project_name: Brutalease
+          project_description: Neo-brutalist release banner
+          theme: |
+            bgOne: '#009DFF'
+            bgTwo: '#ffffff'
+            bgThree: '#f5f5f5'
+            accentOne: '#ffac00'
+            accentTwo: '#FFE3D3'
+            accentThree: '#888'
+            text: '#000000'
+            fontFamily: 'Roboto'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-banner
+          path: release-banner.png
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-banner.png
+          tag_name: ${{ github.event.release.tag_name }}
+
+      - name: Update release description with image
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          IMAGE_URL: https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/release-banner.png
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get current release body
+          RELEASE_BODY=$(gh release view "$RELEASE_TAG" --json body -q .body)
+
+          # Create a temporary file with the new release body
+          echo -e "![Release Banner]($IMAGE_URL)\n\n$RELEASE_BODY" > new_body.md
+
+          # Update the release with the new body
+          gh release edit "$RELEASE_TAG" --notes-file new_body.md
 
       - name: Publish release
         env:

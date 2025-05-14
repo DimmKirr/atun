@@ -6,17 +6,17 @@ Get started with Atun in minutes. Follow these simple steps to set up secure tun
 
 ### macOS
 ```bash
-brew tap automationd/tap
+brew tap DimmKirr/tap
 brew install atun
 ```
 
 ### Alpine Linux
 ```bash
 # Add the repository key
-curl https://alpine.fury.io/automationd/automationd@fury.io-b52e89c2.rsa.pub > /etc/apk/keys/automationd@fury.io-b52e89c2.rsa.pub
+curl https://alpine.fury.io/DimmKirr/DimmKirr@fury.io-b52e89c2.rsa.pub > /etc/apk/keys/DimmKirr@fury.io-b52e89c2.rsa.pub
 
 # Add Atun repository
-echo "https://alpine.fury.io/automationd/" >> /etc/apk/repositories
+echo "https://alpine.fury.io/DimmKirr/" >> /etc/apk/repositories
 
 # Install Atun
 apk update
@@ -25,7 +25,7 @@ apk add atun
 
 ### Windows
 ```powershell
-scoop bucket add automationd https://github.com/automationd/scoop-bucket.git
+scoop bucket add DimmKirr https://github.com/DimmKirr/scoop-bucket.git
 scoop install atun
 ```
 

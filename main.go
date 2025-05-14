@@ -5,7 +5,7 @@
 
 package main
 
-import "github.com/automationd/atun/cmd"
+import "github.com/DimmKirr/atun/cmd"
 
 func main() {
 	cmd.Execute()

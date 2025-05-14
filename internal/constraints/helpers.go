@@ -7,7 +7,7 @@ package constraints
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/go-ini/ini"
 	"github.com/pterm/pterm"
 	"golang.org/x/crypto/ssh/terminal"

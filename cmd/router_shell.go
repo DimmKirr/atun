@@ -2,15 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/automationd/atun/internal/constraints"
+	"github.com/DimmKirr/atun/internal/constraints"
 	"github.com/spf13/cobra"
 	"os/signal"
 	"syscall"
 
-	"github.com/automationd/atun/internal/aws"
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/tunnel"
-	"github.com/automationd/atun/internal/ux"
+	"github.com/DimmKirr/atun/internal/aws"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/tunnel"
+	"github.com/DimmKirr/atun/internal/ux"
 )
 
 // routerShellCmd represents the router ssh command

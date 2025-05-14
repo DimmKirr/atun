@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/automationd/atun/internal/config"
-	"github.com/automationd/atun/internal/constraints"
-	"github.com/automationd/atun/internal/logger"
+	"github.com/DimmKirr/atun/internal/config"
+	"github.com/DimmKirr/atun/internal/constraints"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"

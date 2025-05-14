@@ -8,8 +8,8 @@ package version
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/Masterminds/semver"
-	"github.com/automationd/atun/internal/logger"
 	"github.com/pterm/pterm"
 	"net/http"
 	"runtime"
@@ -53,7 +53,7 @@ func CheckLatestRelease() {
 		return
 	}
 
-	resp, err := http.Get("https://api.github.com/repos/automationd/atun/releases/latest")
+	resp, err := http.Get("https://api.github.com/repos/DimmKirr/atun/releases/latest")
 	if err != nil {
 		logger.Error("Failed to check for the latest version", "error", err)
 	}
@@ -113,7 +113,7 @@ func ShowUpgradeCommand(isDev bool) error {
 	//		pterm.Warning.Println("See https://github.com/hazelops/ize/blob/main/DOCS.md#installation")
 	//	}a
 	default:
-		pterm.Warning.Println("See https://github.com/automationd/atun/blob/main/README.md#installation")
+		pterm.Warning.Println("See https://github.com/DimmKirr/atun/blob/main/README.md#installation")
 	}
 
 	return nil

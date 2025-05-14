@@ -6,14 +6,13 @@ hero:
 #  name: "Atun"
   text: "Private Bastion Tunnels Simplified"
   tagline: Seamless, secure access to a private RDS, Elasticache, DynamoDB, or any other resource. No VPNs, no SSH agents, no friction
-#  logo: ./demo/up.hero.svg
-  icon: 🐟️
+  icon: 🔒
   image:
-#    src: ./logo.png
-    src: /up.hero.svg
-    alt: Banner
-##    width: 750
-#    height: 435
+    src: ./logo.png
+#    src: /up.hero.svg
+    alt: logo
+    width: 350
+    height: 350
     
   actions:
     - theme: brand
@@ -21,7 +20,7 @@ hero:
       link: /guide/quickstart
     - theme: alt
       text: View on Github
-      link: https://github.com/automationd/atun
+      link: https://github.com/DimmKirr/atun
 
 
 features:
@@ -35,3 +34,12 @@ features:
     details: Uses AWS Systems Manager (SSM) for secure connections
     icon: 🔒
 ---
+
+## Getting Started
+You can get started using VitePress right away using `npx`!
+
+```sh
+atun up
+```
+![demo](/up.hero.svg){width=100%}
+
