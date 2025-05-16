@@ -35,9 +35,8 @@ features:
     icon: 🔒
 ---
 
-## Getting Started
-You can get started using VitePress right away using `npx`!
-
+## Usage
+Get the tunnel up and running is simple:
 ```sh
 atun up
 ```
