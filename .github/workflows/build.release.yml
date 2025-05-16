@@ -58,8 +58,8 @@ jobs:
           body: ${{ github.event.release.body }}
           repo_url: ${{ github.repository }}
           output: release-banner.png
-          project_name: Brutalease
-          project_description: Neo-brutalist release banner
+          project_name: Atun
+          project_description: Tunnels Simplified
           theme: |
             bgOne: '#009DFF'
             bgTwo: '#ffffff'
