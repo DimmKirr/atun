@@ -4,7 +4,7 @@ layout: home
 
 hero:
 #  name: "Atun"
-  text: "Private Bastion Tunnels Simplified"
+  text: "AWS Tunnels Simplified"
   tagline: Seamless, secure access to a private RDS, Elasticache, DynamoDB, or any other resource. No VPNs, no SSH agents, no friction
   icon: 🔒
   image:
