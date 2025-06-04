@@ -15,10 +15,8 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
 
-	//"github.com/DimmKirr/atun/internal/config"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -36,6 +34,27 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Parse the flags to make them available for use
+	rootCmd.ParseFlags(os.Args[1:])
+
+	// Check for --json flag in the args
+	hasJSONFlag, _ := rootCmd.Flags().GetBool("json")
+
+	// If --json flag is present, set up plain mode and quiet mode before any initialization
+	if hasJSONFlag {
+		// Set plain mode
+		if err := rootCmd.PersistentFlags().Set("plain", "true"); err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting plain flag: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Disable pterm output for JSON
+		pterm.DisableStyling()
+
+		// Enable quiet mode to suppress all logs except errors
+		logger.SetQuietMode(true)
+	}
+
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
@@ -47,6 +66,12 @@ func init() {
 	if err := viper.BindPFlag("LOG_LEVEL", rootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		pterm.Info.Println("Not binding log-level flag (none provied)")
 	}
+
+	// Plain flag to disable terminal formatting
+	rootCmd.PersistentFlags().Bool("plain", false, "Disable all terminal formatting and colors")
+
+	// JSON flag to root command for global use
+	rootCmd.PersistentFlags().BoolP("json", "j", false, "Output in JSON format when available")
 
 	rootCmd.PersistentFlags().String("aws-profile", "", "Specify AWS profile (defined in ~/.aws/credentials)")
 	if err := viper.BindPFlag("AWS_PROFILE", rootCmd.PersistentFlags().Lookup("aws-profile")); err != nil {
@@ -95,40 +120,27 @@ func initializeAtun() {
 	if err != nil {
 		panic(err)
 	}
-	//
-	//// Ensure all constraints are met
-	//if err := constraints.CheckConstraints(
-	//	constraints.WithAWSProfile(),
-	//	constraints.WithAWSRegion(),
-	//); err != nil {
-	//	pterm.Error.Println("Failed to check constraints:", err)
-	//	os.Exit(1)
-	//}
-	//
-	//// Init AWS Session (probably should be moved to a separate function)
-	//sess, err := aws.GetSession(&aws.SessionConfig{
-	//	Region:      config.App.Config.AWSRegion,
-	//	Profile:     config.App.Config.AWSProfile,
-	//	EndpointUrl: config.App.Config.EndpointUrl,
-	//})
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//logger.Debug("AWS Session initialized")
-	//config.App.Session = sess
+
+	// Check if --plain flag was set
+	if plain, _ := rootCmd.Flags().GetBool("plain"); plain {
+		config.App.Config.LogPlainText = true
+	}
 
 	// Set directory for per-env-per-profile tunnel/cdk
 	config.App.Config.TunnelDir = filepath.Join(config.App.Config.AppDir, fmt.Sprintf("%s-%s", config.App.Config.Env, config.App.Config.AWSProfile))
 
-	if !constraints.SupportsANSIEscapeCodes() || constraints.IsCI() {
-		logger.Debug("Terminal doesn't support ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
-		logger.Debug("Terminal is CI", "isCI", constraints.IsCI())
+	// Only check for ANSI support if we're not in plain mode
+	if !config.App.Config.LogPlainText {
 
-		// If the terminal is non-interactive or doesn't support ANSI, enable plain text logging automatically (even if it's set to false)
-		config.App.Config.LogPlainText = true
-	} else {
-		logger.Debug("Terminal supports ANSI escape codes")
+		if !constraints.SupportsANSIEscapeCodes() || constraints.IsCI() {
+			logger.Debug("Terminal doesn't support ANSI escape codes", "supportsANSI", constraints.SupportsANSIEscapeCodes())
+			logger.Debug("Terminal is CI", "isCI", constraints.IsCI())
+
+			// If the terminal is non-interactive or doesn't support ANSI, enable plain text logging automatically (even if it's set to false)
+			config.App.Config.LogPlainText = true
+		} else {
+			logger.Debug("Terminal supports ANSI escape codes")
+		}
 	}
 
 	logger.Debug("Tunnel directory set. Ensuring it exists", "tunnelDir", config.App.Config.TunnelDir)

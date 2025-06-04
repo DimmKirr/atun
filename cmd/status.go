@@ -6,7 +6,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/DimmKirr/atun/internal/aws"
 	"github.com/DimmKirr/atun/internal/config"
 	"github.com/DimmKirr/atun/internal/logger"
@@ -43,68 +46,142 @@ var statusCmd = &cobra.Command{
 		routerHostID = cmd.Flag("router").Value.String()
 
 		// If router host is not provided, get the first running instance based on the discovery tag (atun.io/version)
+		// Check if we're in JSON mode
+		jsonOutput, _ := cmd.Root().PersistentFlags().GetBool("json")
+
 		if routerHostID == "" {
 			mfaInputRequired := aws.MFAInputRequired(config.App)
 
 			if mfaInputRequired {
-				pterm.Printfln(" %s Authenticating with AWS", pterm.LightBlue("▶︎"))
+				if !jsonOutput {
+					pterm.Printfln(" %s Authenticating with AWS", pterm.LightBlue("▶︎"))
+				}
 				aws.InitAWSClients(config.App)
 			} else {
-				spinnerAWSAuth := ux.NewProgressSpinner("Authenticating with AWS")
+				var spinnerAWSAuth *ux.ProgressSpinner
+				if !jsonOutput {
+					spinnerAWSAuth = ux.NewProgressSpinner("Authenticating with AWS")
+				}
 				aws.InitAWSClients(config.App)
-				spinnerAWSAuth.Success(fmt.Sprintf("Authenticated with AWS account %s", aws.GetAccountId()))
+				if !jsonOutput {
+					spinnerAWSAuth.Success(fmt.Sprintf("Authenticated with AWS account %s", aws.GetAccountId()))
+				}
 			}
-			spinnerRouterDetection := ux.NewProgressSpinner("Detecting Atun routers in AWS")
+
+			var spinnerRouterDetection *ux.ProgressSpinner
+			if !jsonOutput {
+				spinnerRouterDetection = ux.NewProgressSpinner("Detecting Atun routers in AWS")
+			}
+
 			config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 			if err != nil {
-				spinnerRouterDetection.Fail(fmt.Sprintf("No routers found. No --router flag has not been specified and no EC2 instances with atun.io tags found in %s region of AWS account %s.", config.App.Config.AWSRegion, aws.GetAccountId()))
-				if detailedStatus {
-					ux.RenderDetailedStatus()
+				if !jsonOutput {
+					spinnerRouterDetection.Fail(fmt.Sprintf("No routers found. No --router flag has not been specified and no EC2 instances with atun.io tags found in %s region of AWS account %s.", config.App.Config.AWSRegion, aws.GetAccountId()))
+					if detailedStatus {
+						ux.RenderDetailedStatus()
+					}
 				}
-
 				return nil
-
 			}
-			spinnerRouterDetection.Success(fmt.Sprintf("Router found: %s", config.App.Config.RouterHostID))
+
+			if !jsonOutput {
+				spinnerRouterDetection.Success(fmt.Sprintf("Router found: %s", config.App.Config.RouterHostID))
+			}
 		} else {
 			config.App.Config.RouterHostID = routerHostID
 		}
 
-		spinnerGetRouterHostConfig := ux.NewProgressSpinner("Getting router endpoints config")
+		var spinnerGetRouterHostConfig *ux.ProgressSpinner
+		if !jsonOutput {
+			spinnerGetRouterHostConfig = ux.NewProgressSpinner("Getting router endpoints config")
+		}
+
 		routerHostConfig, err := tunnel.GetRouterHostConfig(config.App.Config.RouterHostID)
 		if err != nil {
-			spinnerGetRouterHostConfig.Fail("Error getting router endpoints config", "err", err)
+			if !jsonOutput {
+				spinnerGetRouterHostConfig.Fail("Error getting router endpoints config", "err", err)
+			}
+		} else if !jsonOutput {
+			spinnerGetRouterHostConfig.Success("Router endpoints config retrieved")
 		}
-		spinnerGetRouterHostConfig.Success("Router endpoints config retrieved")
 
 		config.App.Version = routerHostConfig.Version
 		config.App.Config.Hosts = routerHostConfig.Config.Hosts
 		config.App.Config.RouterHostUser = routerHostConfig.Config.RouterHostUser
 
-		spinnerGetSSHTunnelStatus := ux.NewProgressSpinner("Getting SSH tunnel status")
+		var spinnerGetSSHTunnelStatus *ux.ProgressSpinner
+		if !jsonOutput {
+			spinnerGetSSHTunnelStatus = ux.NewProgressSpinner("Getting SSH tunnel status")
+		}
+
 		tunnelActive, endpoints, err := ssh.GetSSHTunnelStatus(config.App)
-		if err != nil {
+		if err != nil && !jsonOutput {
 			spinnerGetSSHTunnelStatus.Fail("Failed to get tunnel status", "error", err)
-		}
-		spinnerGetSSHTunnelStatus.Success("Tunnel status retrieved", "tunnelActive", tunnelActive)
-
-		ux.ClearLines(5)
-		//err = tunnel.RenderEndpointsTable(endpoints)
-		//if err != nil {
-		//	logger.Error("Failed to render endpoints table", "error", err)
-		//}
-
-		err = ux.RenderEndpointsTable(endpoints)
-		if err != nil {
-			logger.Error("Failed to render env table", "error", err)
+		} else if !jsonOutput {
+			spinnerGetSSHTunnelStatus.Success("Tunnel status retrieved", "tunnelActive", tunnelActive)
 		}
 
+		// Get the global --json flag
+		jsonOutput, _ = cmd.Root().PersistentFlags().GetBool("json")
+
+		if jsonOutput {
+			// Prepare data for JSON output
+			statusData := struct {
+				RouterHostID string            `json:"router_host_id"`
+				TunnelActive bool              `json:"tunnel_active"`
+				Endpoints    []ssh.Endpoint    `json:"endpoints"`
+				AWSAccount   string            `json:"aws_account"`
+				AWSRegion    string            `json:"aws_region"`
+				Environment  string            `json:"environment"`
+				Version      string            `json:"version"`
+				Detailed     map[string]string `json:"detailed,omitempty"`
+			}{
+				RouterHostID: config.App.Config.RouterHostID,
+				TunnelActive: tunnelActive,
+				Endpoints:    endpoints,
+				AWSAccount:   aws.GetAccountId(),
+				AWSRegion:    config.App.Config.AWSRegion,
+				Environment:  config.App.Config.Env,
+				Version:      config.App.Version,
+			}
+
+			if detailedStatus {
+				// Add detailed info if requested
+				details := make(map[string]string)
+				cwd, _ := os.Getwd()
+				details["pwd"] = cwd
+				details["ssh_key_path"] = config.App.Config.SSHKeyPath
+				details["config_file"] = config.App.Config.ConfigFile
+				details["router_endpoint_user"] = config.App.Config.RouterHostUser
+				details["socket_path"] = ssh.GetRouterSockFilePath(config.App)
+				details["ssh_config_file"] = ssh.GetSSHConfigFilePath(config.App)
+				statusData.Detailed = details
+			}
+
+			// Output JSON
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetEscapeHTML(false)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(statusData); err != nil {
+				return fmt.Errorf("failed to encode status to JSON: %w", err)
+			}
+		} else {
+			// Original table output
+			ux.ClearLines(5)
+			err = ux.RenderEndpointsTable(endpoints)
+			if err != nil {
+				logger.Error("Failed to render env table", "error", err)
+			}
+
+			if detailedStatus {
+				ux.RenderDetailedStatus()
+			}
+		}
+
+		// Get the router host ID for the final status check
 		config.App.Config.RouterHostID, err = tunnel.GetRouterHostIDFromTags()
 		if err != nil {
 			logger.Error("Router not found. You might want to create it.", "error", err)
-		}
-		if detailedStatus {
-			ux.RenderDetailedStatus()
 		}
 
 		return nil
