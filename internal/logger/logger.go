@@ -15,7 +15,15 @@ import (
 	"github.com/pterm/pterm"
 )
 
-var defaultLogger *slog.Logger
+var (
+	defaultLogger *slog.Logger
+	quietMode     bool
+)
+
+// SetQuietMode enables or disables quiet mode (suppresses all logs except errors and fatals)
+func SetQuietMode(quiet bool) {
+	quietMode = quiet
+}
 
 // Initialize sets up the logger with a specified log level
 func Initialize(logLevel string, logPlainText bool) {
@@ -51,17 +59,23 @@ func Initialize(logLevel string, logPlainText bool) {
 
 // Info logs an info message
 func Info(msg string, keysAndValues ...interface{}) {
-	defaultLogger.Info(msg, keysAndValues...)
+	if !quietMode {
+		defaultLogger.Info(msg, keysAndValues...)
+	}
 }
 
 // Debug logs a debug message
 func Debug(msg string, keysAndValues ...interface{}) {
-	defaultLogger.Debug(msg, keysAndValues...)
+	if !quietMode {
+		defaultLogger.Debug(msg, keysAndValues...)
+	}
 }
 
 // Warn logs a warning message
 func Warn(msg string, keysAndValues ...interface{}) {
-	defaultLogger.Warn(msg, keysAndValues...)
+	if !quietMode {
+		defaultLogger.Warn(msg, keysAndValues...)
+	}
 }
 
 // Error logs an error message
@@ -77,7 +91,9 @@ func Fatal(msg string, keysAndValues ...interface{}) {
 
 // Success prints a user-facing success message with optional centralized control
 func Success(msg string, keysAndValues ...interface{}) {
-	defaultLogger.Info(msg, keysAndValues...)
+	if !quietMode {
+		defaultLogger.Info(msg, keysAndValues...)
+	}
 }
 
 func init() {
