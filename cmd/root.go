@@ -88,6 +88,11 @@ func init() {
 		pterm.Info.Println("Not binding binding env flag (none provided)")
 	}
 
+	rootCmd.PersistentFlags().String("idle-timeout", "", "Tighten SSH keepalive so the tunnel is torn down within roughly this duration of the connection going dead (e.g. 60s). Default: unset, today's lenient keepalive")
+	if err := viper.BindPFlag("SSH_IDLE_TIMEOUT", rootCmd.PersistentFlags().Lookup("idle-timeout")); err != nil {
+		pterm.Info.Println("Not binding idle-timeout flag (none provided)")
+	}
+
 	//if err := viper.BindPFlags(rootCmd.Flags()); err != nil {
 	//	pterm.Error.Println("Error while binding flags")
 	//}
