@@ -269,7 +269,7 @@ func EnsureSSHPublicKeyPresent(instanceID string, publicKey string, routerHostUs
 	}
 
 	command := fmt.Sprintf(
-		`bash -c 'mkdir -p %s/.ssh && grep --qR "%s" %s/.ssh/authorized_keys || echo "%s" >> %s/.ssh/authorized_keys'`,
+		`bash -c 'mkdir -p %s/.ssh && grep -qR "%s" %s/.ssh/authorized_keys || echo "%s" >> %s/.ssh/authorized_keys'`,
 		routerHostUserDirectory,
 		strings.TrimSpace(publicKey),
 		routerHostUserDirectory,

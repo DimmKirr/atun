@@ -66,7 +66,7 @@ func CheckLatestRelease() {
 		gr.Version = "unknown"
 	} else {
 		if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
-			logger.Fatal("Failed to check for the latest version", "error", fmt.Errorf("status code: %d"))
+			logger.Fatal("Failed to check for the latest version", "error", fmt.Errorf("status code: %d", resp.StatusCode))
 		}
 	}
 

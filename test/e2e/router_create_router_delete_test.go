@@ -263,7 +263,7 @@ func startLocalStack(ctx context.Context, t *testing.T, authToken string) testco
 	for _, p := range ports {
 		port := nat.Port(p)
 		portBindings[port] = []nat.PortBinding{
-			{HostIP: "127.0.0.1", HostPort: port.Port()},
+			{HostIP: "0.0.0.0", HostPort: port.Port()},
 		}
 	}
 

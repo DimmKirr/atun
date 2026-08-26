@@ -31,6 +31,7 @@ type Config struct {
 	SSHConfigFile               string
 	SSHStrictHostKeyChecking    bool
 	SSHSocketFile               string
+	SSHIdleTimeout              string
 	AWSProfile                  string
 	AWSRegion                   string
 	AWSKeyPair                  string
@@ -167,6 +168,7 @@ func LoadConfig() error {
 	viper.SetDefault("AWS_INSTANCE_TYPE", "t3.nano")
 	viper.SetDefault("ROUTER_INSTANCE_NAME", "atun-router")
 	viper.SetDefault("SSH_STRICT_HOST_KEY_CHECKING", false) // Strict host key checking is disabled by default for better user experience. Debatable
+	viper.SetDefault("SSH_IDLE_TIMEOUT", "")                // Empty by default: keeps today's lenient SSH keepalive (no forced early teardown)
 	viper.SetDefault("AUTO_ALLOCATE_PORT", false)           // Port auto-allocation is disabled by default
 	viper.SetDefault("LOG_PLAIN_TEXT", false)               // Set LOG_PLAIN_TEXT to false by default
 	viper.SetDefault("TERRAFORM_VERSION", "latest")         // Default to latest Terraform version
@@ -180,6 +182,7 @@ func LoadConfig() error {
 			Env:                         viper.GetString("ENV"),
 			SSHKeyPath:                  viper.GetString("SSH_KEY_PATH"),
 			SSHStrictHostKeyChecking:    viper.GetBool("SSH_STRICT_HOST_KEY_CHECKING"),
+			SSHIdleTimeout:              viper.GetString("SSH_IDLE_TIMEOUT"),
 			AWSProfile:                  viper.GetString("AWS_PROFILE"),
 			AWSRegion:                   viper.GetString("AWS_REGION"),
 			AWSKeyPair:                  viper.GetString("AWS_KEY_PAIR"),
