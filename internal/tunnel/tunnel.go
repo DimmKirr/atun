@@ -13,9 +13,11 @@ import (
 	"github.com/DimmKirr/atun/internal/logger"
 	"github.com/DimmKirr/atun/internal/ssh"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -23,7 +25,8 @@ import (
 // GetRouterHostIDFromTags retrieves the Router Endpoint ID from AWS tags.
 // It takes a session, tag name, and tag value as parameters and returns the instance ID of the Router Endpoint.
 func GetRouterHostIDFromTags() (string, error) {
-	// First try to find router host id from the running processes
+	// First try to find router host id from the running processes, so a router that already
+	// has a live local tunnel is always preferred over any other candidate.
 	activeSSHTunnels, err := ssh.GetActiveSSHTunnels()
 	if err != nil {
 		logger.Debug("Error getting running tunnels", "error", err)
@@ -32,20 +35,9 @@ func GetRouterHostIDFromTags() (string, error) {
 
 	logger.Debug("Running tunnels", "tunnels", activeSSHTunnels)
 
-	if len(activeSSHTunnels) > 0 {
-		// Get the router host ID from the running tunnels
-		var activeOwnedTunnels []config.Config
-		// Check if any of the tunnels have the same RouterHostID
-		for _, v := range activeSSHTunnels {
-			if v.RouterHostID == config.App.Config.RouterHostID {
-				logger.Debug("Found active tunnel with the current RouterHostID", "routerHostID", config.App.Config.RouterHostID)
-				activeOwnedTunnels = append(activeOwnedTunnels, v)
-			}
-		}
-
-		if len(activeOwnedTunnels) < 1 {
-			logger.Debug(fmt.Sprintf("No active tunnels found with the current RouterHostID", "routerHostID", config.App.Config.RouterHostID))
-		}
+	activeTunnelRouterIDs := make(map[string]bool, len(activeSSHTunnels))
+	for _, v := range activeSSHTunnels {
+		activeTunnelRouterIDs[v.RouterHostID] = true
 	}
 
 	logger.Debug("Getting router host ID. Looking for atun routers.")
@@ -62,24 +54,68 @@ func GetRouterHostIDFromTags() (string, error) {
 		return "", err
 	}
 
-	if len(instances) == 0 {
-		err = fmt.Errorf("no instances found with required tags and in state RUNNING")
-		logger.Debug("Error finding instances", "error", err, "tags", tags)
-		return "", err
-	}
+	return selectRouterInstance(instances, activeTunnelRouterIDs)
+}
 
-	logger.Debug("Found instances", "instances", len(instances))
-
+// selectRouterInstance deterministically picks one router instance out of the candidates
+// returned by AWS tag-based discovery. AWS's DescribeInstances does not guarantee stable
+// ordering, so relying on "first in the list" can make repeated `atun up` invocations
+// resolve to different physical instances when more than one candidate matches the
+// discovery tags. Multiple simultaneous candidates are expected, not just a leak: routers
+// can be managed by an ASG for redundancy, so more than one may legitimately be running
+// at once, including mid-scaling-event.
+//
+// Selection order:
+//  1. A candidate with an already-active local tunnel always wins, so an in-use router
+//     session is never abandoned mid-use in favor of some other matching instance.
+//  2. Otherwise, the oldest running candidate wins (deterministic tiebreak). Preferring
+//     the oldest over the newest matters specifically for ASG-managed routers: a freshly
+//     launched instance can report State=running before its networking (security groups,
+//     route tables, ENI attachment) has finished propagating, so preferring the newest
+//     instance systematically prefers the least-proven candidate during any scaling event.
+//     The oldest instance has demonstrated it works.
+//
+// If more than one running candidate exists, a warning is logged so operators get
+// visibility into which candidates are in play instead of silent, effectively-random selection.
+func selectRouterInstance(instances []*ec2.Instance, activeTunnelRouterIDs map[string]bool) (string, error) {
+	var running []*ec2.Instance
 	for _, instance := range instances {
-		logger.Debug("Found instance", "instance_id", *instance.InstanceId, "state", *instance.State.Name)
-
-		// Use the first running instance found
-		if *instance.InstanceId != "" && *instance.State.Name == "running" {
-			return *instance.InstanceId, err
+		if instance.InstanceId == nil || instance.State == nil || instance.State.Name == nil {
+			continue
+		}
+		if *instance.State.Name == "running" && *instance.InstanceId != "" {
+			running = append(running, instance)
 		}
 	}
 
-	return "", err
+	if len(running) == 0 {
+		return "", fmt.Errorf("no instances found with required tags and in state RUNNING")
+	}
+
+	sort.SliceStable(running, func(i, j int) bool {
+		ti, tj := running[i].LaunchTime, running[j].LaunchTime
+		if ti == nil || tj == nil {
+			return false
+		}
+		return ti.Before(*tj)
+	})
+
+	if len(running) > 1 {
+		ids := make([]string, len(running))
+		for i, instance := range running {
+			ids[i] = *instance.InstanceId
+		}
+		logger.Warn("Multiple router instances match the discovery tags; selecting deterministically", "candidates", ids)
+	}
+
+	for _, instance := range running {
+		if activeTunnelRouterIDs[*instance.InstanceId] {
+			logger.Debug("Preferring instance with an active local tunnel", "instance_id", *instance.InstanceId)
+			return *instance.InstanceId, nil
+		}
+	}
+
+	return *running[0].InstanceId, nil
 }
 
 // GetRouterHostConfig Gets router host tags and unmarshalls it into a struct
