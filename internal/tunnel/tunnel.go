@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // GetRouterHostIDFromTags retrieves the Router Endpoint ID from AWS tags.
@@ -215,6 +216,23 @@ func SetAWSCredentials(sess *session.Session) error {
 	return nil
 }
 
+const (
+	// tunnelReadinessTimeout bounds how long ActivateTunnel waits for a freshly-started tunnel's
+	// endpoints to become genuinely reachable before giving up and returning whatever state was
+	// last observed. SSM session establishment (API call, WebSocket handshake, session-manager-
+	// plugin cold start, sshd negotiation on the router) typically takes a few seconds but can
+	// stretch further on a cold CI runner.
+	tunnelReadinessTimeout = 15 * time.Second
+	// tunnelReadinessPollInterval is how often readiness is re-checked while waiting.
+	tunnelReadinessPollInterval = 500 * time.Millisecond
+	// tunnelReadinessStableChecks requires readiness to hold across this many consecutive polls
+	// before declaring the tunnel ready, since a half-negotiated channel can briefly appear open.
+	tunnelReadinessStableChecks = 2
+	// tunnelReadinessProbeHold is how long ProbeEndpointReachability holds each connection open
+	// waiting to see if it gets torn down by a failed remote channel open.
+	tunnelReadinessProbeHold = 300 * time.Millisecond
+)
+
 // ActivateTunnel starts the SSH tunnel and SSM plugin
 func ActivateTunnel(app *config.Atun) (bool, []ssh.Endpoint, error) {
 	logger.Debug("Starting tunnel", "router", app.Config.RouterHostID, "SSHKeyPath", app.Config.SSHKeyPath, "SSHConfigFile", app.Config.SSHConfigFile, "env", app.Config.Env)
@@ -246,10 +264,75 @@ func ActivateTunnel(app *config.Atun) (bool, []ssh.Endpoint, error) {
 		if err != nil {
 			return tunnelIsUp, nil, err
 		}
+
+		// The local LocalForward socket binds almost immediately, well before the SSM data
+		// channel and the router's own connection to the real remote target (e.g. an RDS
+		// instance inside a VPC) have finished negotiating. Poll until every endpoint's SSH
+		// channel is genuinely open instead of trusting the very first check.
+		return waitForTunnelReady(func() (bool, bool, []ssh.Endpoint, error) {
+			up, endpoints, statusErr := ssh.GetSSHTunnelStatus(app)
+			if statusErr != nil {
+				return false, up, endpoints, statusErr
+			}
+			ready := up && allEndpointsReachable(endpoints)
+			return ready, up, endpoints, nil
+		}, tunnelReadinessTimeout, tunnelReadinessPollInterval, tunnelReadinessStableChecks)
 	}
 	// Check for status and collect connections again
 	tunnelIsUp, connections, err = ssh.GetSSHTunnelStatus(app)
 	return tunnelIsUp, connections, nil
+}
+
+// allEndpointsReachable verifies every locally-listening endpoint has a genuinely working SSH
+// channel to its remote destination, using ProbeEndpointReachability rather than trusting the
+// plain local-port check already folded into each Endpoint's Status.
+func allEndpointsReachable(endpoints []ssh.Endpoint) bool {
+	if len(endpoints) == 0 {
+		return false
+	}
+	for _, endpoint := range endpoints {
+		if !endpoint.Status {
+			return false
+		}
+		reachable, err := ssh.ProbeEndpointReachability(endpoint.LocalPort, tunnelReadinessProbeHold)
+		if err != nil || !reachable {
+			return false
+		}
+	}
+	return true
+}
+
+// waitForTunnelReady polls pollOnce until it reports ready for stableChecks consecutive polls, or
+// timeout elapses. Readiness must hold for consecutive polls (not just once) because a
+// half-negotiated SSH channel can briefly appear open before being torn down. Returns the last
+// known state either way on timeout — the caller's existing status reporting surfaces any
+// endpoints that never became ready, rather than this function treating a timeout as fatal.
+func waitForTunnelReady(
+	pollOnce func() (ready bool, up bool, endpoints []ssh.Endpoint, err error),
+	timeout time.Duration,
+	pollInterval time.Duration,
+	stableChecks int,
+) (bool, []ssh.Endpoint, error) {
+	deadline := time.Now().Add(timeout)
+	consecutive := 0
+
+	for {
+		ready, up, endpoints, err := pollOnce()
+
+		if err == nil && ready {
+			consecutive++
+			if consecutive >= stableChecks {
+				return up, endpoints, nil
+			}
+		} else {
+			consecutive = 0
+		}
+
+		if time.Now().After(deadline) {
+			return up, endpoints, err
+		}
+		time.Sleep(pollInterval)
+	}
 }
 
 // DeactivateTunnel stops the SSH tunnel and SSM plugin

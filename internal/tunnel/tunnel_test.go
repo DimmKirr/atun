@@ -6,9 +6,11 @@
 package tunnel
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/DimmKirr/atun/internal/ssh"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
@@ -85,5 +87,85 @@ func TestSelectRouterInstance_EmptyInputReturnsError(t *testing.T) {
 	_, err := selectRouterInstance(nil, nil)
 	if err == nil {
 		t.Fatal("expected an error for empty instance list")
+	}
+}
+
+func TestWaitForTunnelReady_ReadyOnFirstPoll(t *testing.T) {
+	endpoints := []ssh.Endpoint{{LocalPort: 1234, Status: true}}
+	pollOnce := func() (bool, bool, []ssh.Endpoint, error) {
+		return true, true, endpoints, nil
+	}
+
+	up, got, err := waitForTunnelReady(pollOnce, 50*time.Millisecond, 5*time.Millisecond, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !up {
+		t.Error("expected tunnel to be reported up")
+	}
+	if len(got) != 1 || got[0].LocalPort != 1234 {
+		t.Errorf("expected endpoints to be returned, got: %v", got)
+	}
+}
+
+func TestWaitForTunnelReady_BecomesReadyAfterStableChecks(t *testing.T) {
+	calls := 0
+	pollOnce := func() (bool, bool, []ssh.Endpoint, error) {
+		calls++
+		// Not ready for the first 2 polls, then ready for 2 consecutive polls.
+		ready := calls >= 3
+		return ready, true, nil, nil
+	}
+
+	up, _, err := waitForTunnelReady(pollOnce, time.Second, time.Millisecond, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !up {
+		t.Error("expected tunnel to be reported up")
+	}
+	// Needs polls 3 and 4 to both be ready to satisfy stableChecks=2.
+	if calls < 4 {
+		t.Errorf("expected at least 4 polls to require 2 consecutive ready results, got %d", calls)
+	}
+}
+
+func TestWaitForTunnelReady_ResetsDebounceOnFlap(t *testing.T) {
+	calls := 0
+	pollOnce := func() (bool, bool, []ssh.Endpoint, error) {
+		calls++
+		// Ready once, then flaps back to not-ready (resetting the debounce counter) before
+		// becoming stably ready.
+		if calls == 1 {
+			return true, true, nil, nil
+		}
+		if calls == 2 {
+			return false, true, nil, nil
+		}
+		return true, true, nil, nil
+	}
+
+	_, _, err := waitForTunnelReady(pollOnce, time.Second, time.Millisecond, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Poll 1 alone would satisfy stableChecks=1 but not stableChecks=2; the flap at poll 2
+	// resets the counter, so true readiness only lands after polls 3 and 4 are both ready.
+	if calls < 4 {
+		t.Errorf("expected the flap at poll 2 to reset the debounce, requiring at least 4 polls, got %d", calls)
+	}
+}
+
+func TestWaitForTunnelReady_TimesOutReturningLastKnownState(t *testing.T) {
+	pollOnce := func() (bool, bool, []ssh.Endpoint, error) {
+		return false, false, nil, fmt.Errorf("endpoint not reachable")
+	}
+
+	up, _, err := waitForTunnelReady(pollOnce, 20*time.Millisecond, 5*time.Millisecond, 2)
+	if err == nil {
+		t.Fatal("expected the last error to be returned on timeout")
+	}
+	if up {
+		t.Error("expected tunnel to be reported down after never becoming ready")
 	}
 }

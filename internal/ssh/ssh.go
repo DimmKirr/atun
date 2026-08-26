@@ -523,6 +523,54 @@ func CheckPort(port int) (bool, string, error) {
 	return true, processName, nil
 }
 
+// ProbeEndpointReachability checks whether the SSH LocalForward on the given local port has a
+// genuinely working channel to its remote destination, not just a bound local socket. CheckPort's
+// plain TCP dial only proves the local ssh listener is up — that happens almost immediately on
+// tunnel start, well before the underlying SSM data channel and the remote sshd's own connection
+// to the real destination (e.g. an RDS cluster inside a VPC) have finished negotiating.
+//
+// Per RFC 4254, sshd only confirms a direct-tcpip channel open after it has completed a real
+// TCP connect() to the destination host:port. So if the connection sshd hands back stays open
+// past a short deadline (or the remote sends data unprompted, e.g. MySQL's handshake), the
+// channel open succeeded and the destination is genuinely reachable. If the destination connect
+// failed, sshd tears the local connection down almost immediately (EOF/reset). This works without
+// any awareness of the protocol actually running on the forwarded port.
+func ProbeEndpointReachability(port int, holdDuration time.Duration) (bool, error) {
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return false, fmt.Errorf("can't resolve address: %w", err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		if opErr, ok := err.(*net.OpError); ok && opErr.Op == "dial" {
+			// Port is not open yet
+			return false, nil
+		}
+		return false, fmt.Errorf("error dialing TCP: %w", err)
+	}
+	defer conn.Close()
+
+	if err := conn.SetReadDeadline(time.Now().Add(holdDuration)); err != nil {
+		return false, fmt.Errorf("can't set read deadline: %w", err)
+	}
+
+	buf := make([]byte, 1)
+	_, err = conn.Read(buf)
+	if err == nil {
+		// Remote sent data unprompted (e.g. MySQL's handshake) — definitely reachable.
+		return true, nil
+	}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		// No data within the window, but the connection wasn't torn down either — the
+		// channel to the remote destination is open and holding.
+		return true, nil
+	}
+	// EOF or connection reset: the remote-side channel open failed and sshd tore the
+	// local connection down.
+	return false, nil
+}
+
 func getProcessIDByPort(port int) (int, error) {
 	cmd := exec.Command("lsof", "-sTCP:LISTEN", "-i", fmt.Sprintf(":%d", port), "-t")
 	output, err := cmd.Output()
